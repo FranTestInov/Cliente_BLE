@@ -16,6 +16,8 @@
 #define CHARACTERISTIC_UUID_HUM   "d2b2d3e1-36e1-4688-b7f5-ea07361b26a8"
 #define CHARACTERISTIC_UUID_CO2   "a1b2c3d4-5678-90ab-cdef-1234567890ab"
 #define CHARACTERISTIC_UUID_CALIBRATE "12345678-1234-1234-1234-123456789abc"
+#define CHARACTERISTIC_UUID_SYSTEM_STATE "c1a7d131-15e1-413f-b565-8123c5a31a1e"
+#define CHARACTERISTIC_UUID_COOLER_STATE "d2b8d232-26f1-4688-b7f5-ea07361b26a8"
 
 // --- Variables estáticas para BLE (privadas a este archivo) ---
 static BLEClient* pClient = nullptr;
@@ -24,6 +26,8 @@ static BLERemoteCharacteristic* pRemoteCharacteristicPres = nullptr;
 static BLERemoteCharacteristic* pRemoteCharacteristicHum  = nullptr;
 static BLERemoteCharacteristic* pRemoteCharacteristicCO2  = nullptr;
 static BLERemoteCharacteristic* pRemoteCharacteristicCalibrate = nullptr;
+static BLERemoteCharacteristic* pRemoteCharacteristicSystemState = nullptr;
+static BLERemoteCharacteristic* pRemoteCharacteristicCoolerState = nullptr;
 
 static bool deviceFound = false;
 static String serverAddress = "";
@@ -82,7 +86,7 @@ void CommunicationManager::run() {
   // 2. Leer sensores periódicamente si estamos conectados
   if (isConnected && millis() - lastSensorReadTime > 1000) {
     lastSensorReadTime = millis();
-    readAllSensors();
+    readServerData();
   }
 
   // 3. Revisar si hay comandos nuevos desde el PC
@@ -116,8 +120,10 @@ void CommunicationManager::handleSerialCommands() {
     } else if (command == "OPEN_ALL") {
       executionManager.triggerPanicMode();
     
+    } else if (command == "TOGGLE_COOLER") {
+        toggleCooler();
     } else {
-      Serial.println("ERROR: Comando no reconocido");
+        Serial.println("ERROR: Comando no reconocido");
     }
   }
 }
@@ -131,10 +137,12 @@ void CommunicationManager::sendStatusToPC() {
   // Formato: "STATUS:[estado];TEMP:[val];HUM:[val];PRES:[val];CO2:[val]\n"
   // Este formato es fácil de procesar en la aplicación de Python
   String statusStr = "STATUS:" + String(executionManager.getCurrentState()) + ";";
-  statusStr += "TEMP:" + String(lastSensorData.temperature, 2) + ";";
-  statusStr += "HUM:" + String(lastSensorData.humidity, 2) + ";";
-  statusStr += "PRES:" + String(lastSensorData.pressure, 2) + ";";
-  statusStr += "CO2:" + String(lastSensorData.co2);
+  statusStr += "TEMP:" + String(lastServerData.temperature, 2) + ";";
+  statusStr += "HUM:" + String(lastServerData.humidity, 2) + ";";
+  statusStr += "PRES:" + String(lastServerData.pressure, 2) + ";";
+  statusStr += "CO2:" + String(lastServerData.co2);
+  statusStr += "PCB1_STATE:" + lastServerData.systemState + ";";
+  statusStr += "COOLER:" + lastServerData.coolerState;
   
   // Usamos un temporizador para no saturar el puerto serie
   static unsigned long lastStatusSendTime = 0;
@@ -173,6 +181,8 @@ void CommunicationManager::connectToServer() {
       pRemoteCharacteristicHum  = pRemoteService->getCharacteristic(CHARACTERISTIC_UUID_HUM);
       pRemoteCharacteristicCO2  = pRemoteService->getCharacteristic(CHARACTERISTIC_UUID_CO2);
       pRemoteCharacteristicCalibrate = pRemoteService->getCharacteristic(CHARACTERISTIC_UUID_CALIBRATE);
+      pRemoteCharacteristicSystemState = pRemoteService->getCharacteristic(CHARACTERISTIC_UUID_SYSTEM_STATE);
+      pRemoteCharacteristicCoolerState = pRemoteService->getCharacteristic(CHARACTERISTIC_UUID_COOLER_STATE);
       isConnected = true;
     } else {
       Serial.println("ERROR: No se pudo encontrar el servicio en el servidor.");
@@ -188,11 +198,33 @@ void CommunicationManager::connectToServer() {
  * 
  * Actualiza la estructura lastSensorData con los valores leídos.
  */
-void CommunicationManager::readAllSensors() {
+void CommunicationManager::readServerData() {
     if (!isConnected) return;
 
-    if(pRemoteCharacteristicTemp) lastSensorData.temperature = String(pRemoteCharacteristicTemp->readValue().c_str()).toFloat();
-    if(pRemoteCharacteristicPres) lastSensorData.pressure = String(pRemoteCharacteristicPres->readValue().c_str()).toFloat();
-    if(pRemoteCharacteristicHum) lastSensorData.humidity = String(pRemoteCharacteristicHum->readValue().c_str()).toFloat();
-    if(pRemoteCharacteristicCO2) lastSensorData.co2 = String(pRemoteCharacteristicCO2->readValue().c_str()).toInt();
+    if(pRemoteCharacteristicTemp) lastServerData.temperature = String(pRemoteCharacteristicTemp->readValue().c_str()).toFloat();
+    if(pRemoteCharacteristicPres) lastServerData.pressure = String(pRemoteCharacteristicPres->readValue().c_str()).toFloat();
+    if(pRemoteCharacteristicHum) lastServerData.humidity = String(pRemoteCharacteristicHum->readValue().c_str()).toFloat();
+    if(pRemoteCharacteristicCO2) lastServerData.co2 = String(pRemoteCharacteristicCO2->readValue().c_str()).toInt();
+    if (pRemoteCharacteristicSystemState) {
+        // Paso 1: Guardamos el resultado de readValue() en una variable explícita.
+        std::string stateValue = pRemoteCharacteristicSystemState->readValue();
+        // Paso 2: Ahora convertimos esa variable a String de Arduino.
+        lastServerData.systemState = String(stateValue.c_str());
+    }
+        if (pRemoteCharacteristicCoolerState) {
+        // Hacemos lo mismo para el estado del cooler.
+        std::string coolerValue = pRemoteCharacteristicCoolerState->readValue();
+        lastServerData.coolerState = String(coolerValue.c_str());
+    }
+}
+
+void CommunicationManager::toggleCooler() {
+    if (isConnected && pRemoteCharacteristicCoolerState) {
+        Serial.println("Enviando comando para alternar el cooler al servidor...");
+        // Cualquier escritura al servidor alternará el estado del cooler.
+        // Enviamos "1" como un valor genérico.
+        pRemoteCharacteristicCoolerState->writeValue("1", 1);
+    } else {
+        Serial.println("WARN: No se puede alternar el cooler, no hay conexión BLE.");
+    }
 }

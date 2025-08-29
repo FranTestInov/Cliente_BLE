@@ -16,16 +16,19 @@
 #include "ExecutionManager.h" // Incluimos para poder interactuar con él
 
 /**
- * @struct SensorData
+ * @struct ServerData
  * @brief Estructura para almacenar los datos de los sensores leídos del servidor BLE.
  * 
  * Agrupa todos los valores de los sensores en un único objeto para facilitar su manejo y transmisión.
  */
-struct SensorData {
+ 
+struct ServerData {
   float temperature = 0.0; ///< Temperatura en grados Celsius.
   float humidity = 0.0;    ///< Humedad relativa en porcentaje (%).
   float pressure = 0.0;    ///< Presión atmosférica en hectopascales (hPa).
   int co2 = 0;             ///< Concentración de CO2 en partes por millón (ppm).
+  String systemState = "UNKNOWN"; // NUEVO: Para guardar el estado del PCB1
+  String coolerState = "UNKNOWN"; // NUEVO: Para guardar el estado del cooler
 };
 
 /**
@@ -59,10 +62,14 @@ public:
    */
   void run();
 
+  void toggleCooler();
+
+
+
 private:
   // --- Atributos de Comunicación ---
   ExecutionManager& executionManager; ///< Referencia al gestor de ejecución para interactuar con la lógica de control.
-  SensorData lastSensorData;          ///< Almacena los últimos datos leídos de los sensores.
+  ServerData lastServerData;          ///< Almacena los últimos datos leídos de los sensores.
   unsigned long lastSensorReadTime = 0; ///< Marca de tiempo para controlar la frecuencia de lectura de sensores.
 
   // --- Métodos Privados de Gestión ---
@@ -92,7 +99,7 @@ private:
   /**
    * @brief Lee todas las características de los sensores del servidor BLE.
    */
-  void readAllSensors();
+  void readServerData();
 };
 
 #endif // COMMUNICATION_MANAGER_H
