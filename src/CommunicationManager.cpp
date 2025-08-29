@@ -1,4 +1,14 @@
+/**
+ * @file CommunicationManager.cpp
+ * @brief Implementación de la clase CommunicationManager para la gestión de comunicación BLE y comandos serie.
+ * 
+ * Este archivo contiene la implementación de la clase CommunicationManager, que se encarga de gestionar la conexión BLE
+ * con el servidor, la lectura de sensores remotos, el manejo de comandos recibidos por el puerto serie y el envío de datos
+ * de estado al PC.
+ */
+
 #include "CommunicationManager.h"
+
 // --- UUIDs y otras definiciones de BLE ---
 #define SERVICE_UUID              "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
 #define CHARACTERISTIC_UUID_TMP   "beb5483e-36e1-4688-b7f5-ea07361b26a8"
@@ -18,8 +28,16 @@ static BLERemoteCharacteristic* pRemoteCharacteristicCalibrate = nullptr;
 static bool deviceFound = false;
 static String serverAddress = "";
 
-// Callback de BLE (se puede mantener aquí ya que es específico de la implementación)
+/**
+ * @brief Callback para dispositivos BLE anunciados durante el escaneo.
+ * 
+ * Esta clase se utiliza para detectar el servidor BLE con el UUID de servicio esperado.
+ */
 class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
+  /**
+   * @brief Método llamado cuando se encuentra un dispositivo BLE durante el escaneo.
+   * @param advertisedDevice Referencia al dispositivo BLE anunciado.
+   */
   void onResult(BLEAdvertisedDevice advertisedDevice) {
     if (advertisedDevice.haveServiceUUID() && advertisedDevice.getServiceUUID().toString() == SERVICE_UUID) {
       Serial.println("Dispositivo BLE encontrado!");
@@ -32,8 +50,17 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
 
 // --- Implementación de la Clase ---
 
+/**
+ * @brief Constructor de CommunicationManager.
+ * @param execManager Referencia al ExecutionManager para la gestión de procesos.
+ */
 CommunicationManager::CommunicationManager(ExecutionManager& execManager) : executionManager(execManager) {}
 
+/**
+ * @brief Inicializa el módulo de comunicación.
+ * 
+ * Configura el puerto serie, inicializa BLE y comienza el escaneo del servidor.
+ */
 void CommunicationManager::init() {
   Serial.begin(115200); // Usamos una velocidad más alta
   BLEDevice::init("ESP32_BLE_Client");
@@ -41,6 +68,11 @@ void CommunicationManager::init() {
   Serial.println("Communication Manager inicializado.");
 }
 
+/**
+ * @brief Bucle principal de la comunicación.
+ * 
+ * Gestiona la conexión BLE, lee sensores remotos, maneja comandos serie y envía el estado al PC.
+ */
 void CommunicationManager::run() {
   // 1. Gestionar conexión BLE
   if (!isConnected && deviceFound) {
@@ -60,6 +92,11 @@ void CommunicationManager::run() {
   sendStatusToPC();
 }
 
+/**
+ * @brief Maneja los comandos recibidos por el puerto serie.
+ * 
+ * Interpreta y ejecuta comandos como SET_CO2, CALIBRATE_SENSOR y OPEN_ALL.
+ */
 void CommunicationManager::handleSerialCommands() {
   if (Serial.available() > 0) {
     String command = Serial.readStringUntil('\n');
@@ -85,6 +122,11 @@ void CommunicationManager::handleSerialCommands() {
   }
 }
 
+/**
+ * @brief Envía el estado actual y los datos de sensores al PC por el puerto serie.
+ * 
+ * El formato es: "STATUS:[estado];TEMP:[val];HUM:[val];PRES:[val];CO2:[val]\n"
+ */
 void CommunicationManager::sendStatusToPC() {
   // Formato: "STATUS:[estado];TEMP:[val];HUM:[val];PRES:[val];CO2:[val]\n"
   // Este formato es fácil de procesar en la aplicación de Python
@@ -104,6 +146,9 @@ void CommunicationManager::sendStatusToPC() {
 
 // --- Métodos de BLE ---
 
+/**
+ * @brief Inicia el escaneo para encontrar el servidor BLE.
+ */
 void CommunicationManager::scanForServer() {
   Serial.println("Buscando servidor BLE...");
   BLEScan* pScan = BLEDevice::getScan();
@@ -112,6 +157,9 @@ void CommunicationManager::scanForServer() {
   pScan->start(5, false); // Escaneo de 5 segundos
 }
 
+/**
+ * @brief Conecta al servidor BLE y obtiene las características remotas.
+ */
 void CommunicationManager::connectToServer() {
   Serial.println("Conectando al servidor BLE...");
   pClient = BLEDevice::createClient();
@@ -135,6 +183,11 @@ void CommunicationManager::connectToServer() {
   }
 }
 
+/**
+ * @brief Lee los valores de los sensores remotos a través de BLE.
+ * 
+ * Actualiza la estructura lastSensorData con los valores leídos.
+ */
 void CommunicationManager::readAllSensors() {
     if (!isConnected) return;
 
