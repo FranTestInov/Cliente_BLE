@@ -68,7 +68,7 @@ CommunicationManager::CommunicationManager(ExecutionManager& execManager) : exec
 void CommunicationManager::init() {
   Serial.begin(115200); // Usamos una velocidad más alta
   BLEDevice::init("ESP32_BLE_Client");
-  scanForServer();
+  //scanForServer();
   Serial.println("Communication Manager inicializado.");
 }
 
@@ -79,6 +79,10 @@ void CommunicationManager::init() {
  */
 void CommunicationManager::run() {
   // 1. Gestionar conexión BLE
+  if (!isConnected && !deviceFound && !isScanning) {
+    scanForServer();
+  }
+
   if (!isConnected && deviceFound) {
     connectToServer();
   }
@@ -162,13 +166,17 @@ void CommunicationManager::scanForServer() {
   BLEScan* pScan = BLEDevice::getScan();
   pScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
   pScan->setActiveScan(true);
-  pScan->start(5, false); // Escaneo de 5 segundos
+  pScan->start(5, true); // Escaneo de 5 segundos
+  isScanning = true; 
 }
 
 /**
  * @brief Conecta al servidor BLE y obtiene las características remotas.
  */
 void CommunicationManager::connectToServer() {
+  BLEDevice::getScan()->stop();
+  isScanning = false;
+
   Serial.println("Conectando al servidor BLE...");
   pClient = BLEDevice::createClient();
   
@@ -186,7 +194,7 @@ void CommunicationManager::connectToServer() {
       isConnected = true;
     } else {
       Serial.println("ERROR: No se pudo encontrar el servicio en el servidor.");
-      pClient->disconnect();
+    deviceFound = false; // Permitimos que el ciclo de escaneo comience de nuevo.
     }
   } else {
     Serial.println("ERROR: No se pudo conectar al servidor BLE.");

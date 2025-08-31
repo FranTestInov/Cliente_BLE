@@ -8,8 +8,8 @@ CommunicationManager communicationManager(executionManager); // Le pasamos el ex
 
 void setup() {
   // Espera a que el puerto serial se conecte para no perder mensajes iniciales
-  while (!Serial); 
-  delay(1000);
+  //while (!Serial); 
+  delay(2000);
 
   // Inicializamos cada uno de nuestros managers
   executionManager.init();

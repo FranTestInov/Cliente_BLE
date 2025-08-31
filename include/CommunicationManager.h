@@ -85,6 +85,7 @@ private:
   
   // --- Métodos y Atributos de BLE ---
   bool isConnected = false; ///< Flag que indica si el cliente está conectado al servidor BLE.
+  bool isScanning = false; // NUEVO: para controlar si estamos escaneando activamente
 
   /**
    * @brief Intenta conectar con el servidor BLE una vez encontrado.
