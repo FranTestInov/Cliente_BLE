@@ -7,3 +7,5 @@ Thumbs.db
 # Archivos y carpetas de PlatformIO
 .pio/
 firmware.*
+
+*.xlsx

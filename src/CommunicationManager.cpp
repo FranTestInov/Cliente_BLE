@@ -133,17 +133,17 @@ void CommunicationManager::handleSerialCommands()
     {
       executionManager.startCalibrationProcess();
     }
-    else if (command == "OPEN_ALL")
+    else if (command == "PULSE")
     {
-      executionManager.triggerPanicMode();
+      executionManager.startPulseProcess();
     }
     else if (command == "TOGGLE_COOLER")
     {
       toggleCooler();
     }
-    else if (command == "PULSE")
+    else if (command == "OPEN_ALL")
     {
-      // Generar un pulso de 10ms en la valvula de CO2
+      executionManager.triggerPanicMode();
     }
     else
     {
@@ -161,7 +161,7 @@ void CommunicationManager::sendStatusToPC()
 {
   // Formato: "STATUS:[estado];TEMP:[val];HUM:[val];PRES:[val];CO2:[val]\n"
   // Este formato es fácil de procesar en la aplicación de Python
-  String statusStr = "STATUS:" + String(executionManager.getCurrentState()) + ";";
+  String statusStr = "PCB2_STATE:" + String(executionManager.getCurrentState()) + ";";
   statusStr += "TEMP:" + String(lastServerData.temperature, 2) + ";";
   statusStr += "HUM:" + String(lastServerData.humidity, 2) + ";";
   statusStr += "PRES:" + String(lastServerData.pressure, 2) + ";";

@@ -23,8 +23,9 @@ ExecutionManager::ExecutionManager()
 {
   currentState = IDLE;
   setpointState = MEASURING;
+  pulseState = IDEL;
   setpoint = 0;
-}
+};
 
 /**
  * @brief Inicializa los pines de las válvulas y asegura que todas comiencen cerradas.
@@ -69,13 +70,15 @@ void ExecutionManager::run()
     {
 
     case MEASURING:
+    {
       // Estamos esperando a que el gas se estabilice.
       if (now - lastCycleTime >= STABILIZATION_TIME_MS)
       {
         // Se cumplió el tiempo de estabilización, ahora inicia otro proceso de acción.
         setpointState = CALCULATING;
       }
-      break;
+    }
+    break;
 
     case CALCULATING:
     {
@@ -108,6 +111,11 @@ void ExecutionManager::run()
       else
       {
         digitalWrite(VALVE_CO2_PIN, LOW); // Cerramos válvula de CO2
+        float currentCO2 = communicationManager.getLastServerData().co2;
+        if (currentCO2 >= setpoint)
+        {
+          digitalWrite(VALVE_AIR_PIN, HIGH);
+        }
       }
 
       // Verificamos si el ciclo de actuación ha terminado.
@@ -116,6 +124,7 @@ void ExecutionManager::run()
         // El ciclo de actuación terminó, cerramos la válvula por si acaso
         // y pasamos a la fase de estabilización.
         digitalWrite(VALVE_CO2_PIN, LOW);
+        digitalWrite(VALVE_AIR_PIN, LOW);
         lastCycleTime = now;
         setpointState = MEASURING;
       }
@@ -130,6 +139,31 @@ void ExecutionManager::run()
   {
     break;
   }
+
+  case PULSE:
+  {
+    switch (pulseState)
+    {
+    case PULSE_START:
+    {
+      digitalWrite(VALVE_CO2_PIN, HIGH);
+      lastCycleTime = millis();
+      pulseState = PULSE_END;
+    }
+    break;
+    case PULSE_END:
+    {
+      if (millis() - lastCycleTime >= PULSE_CO2)
+      {
+        digitalWrite(VALVE_CO2_PIN, LOW);
+        currentState = IDLE;
+        pulseState = IDEL;
+      }
+    }
+    break;
+    }
+  }
+  break;
   case PANIC_MODE:
   {
     // Estado seguro
@@ -180,6 +214,26 @@ void ExecutionManager::startCalibrationProcess()
   else
   {
     Serial.println("WARN: No se puede iniciar Calibración, otro proceso está en curso.");
+  }
+}
+
+/**
+ * @brief Funcion para generar un puslo de 10ms en la valvula de CO2
+ * Este metodo se llamara desde CommunicationManager cuando se reciba el comando "PULSE"
+ * No interrumpe ningun proceso en curso
+ */
+void ExecutionManager::startPulseProcess()
+{
+  if (currentState == IDLE)
+  {
+    Serial.println("Iniciando proceso de Pulso de 10ms en la valvula de CO2");
+    pulseState = PULSE_START;
+    lastCycleTime = millis();
+    currentState = PULSE;
+  }
+  else
+  {
+    Serial.println("WARN: No se puede iniciar Pulso, otro proceso está en curso.");
   }
 }
 

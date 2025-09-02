@@ -27,6 +27,7 @@ enum SystemState
   IDLE,                  ///< El sistema está en espera, sin realizar ninguna acción.
   EXECUTING_SETPOINT,    ///< El sistema está ejecutando un proceso de control para alcanzar un setpoint de CO2.
   EXECUTING_CALIBRATION, ///< El sistema está ejecutando una rutina de calibración.
+  PULSE,                 ///< El sistema está generando un pulso en la válvula de CO2.
   PANIC_MODE             ///< Estado de emergencia donde se abren todas las válvulas.
 };
 
@@ -39,6 +40,18 @@ enum SetpointSubState
   MEASURING,   ///< El sistema está esperando que el sensor se estabilice para tomar una nueva medida.
   CALCULATING, ///< El sistema calcula la nueva salida del PID.
   ACTUATING    ///< El sistema aplica la salida del PID a las válvulas durante un ciclo de PWM.
+};
+
+/**
+ * @enum PulseState
+ * @brief Define los estados para generar un puslo de 10 ms
+ */
+
+enum PulseState
+{
+  IDEL,
+  PULSE_START,
+  PULSE_END
 };
 
 /**
@@ -58,22 +71,27 @@ public:
   void run();
   void startSetpointProcess(int targetConcentration);
   void startCalibrationProcess();
+  void startPulseProcess();
   void triggerPanicMode();
   SystemState getCurrentState(); // Metodo que devuelve un objeto del tipo SystemState
 
 private:
-  // Son todos atributos privados
-  SystemState currentState; // Almacena el estado actual de la máquina de estados.
-
-  PIDController pidController; // Para guardar el setpoint del proceso actual
+  // Atributos de control
   int setpoint;                // Para guardar el setpoint del proceso actual
+  PIDController pidController; // Para guardar el setpoint del proceso actual
 
+  // Maquinas de estado
+  SystemState currentState;       // Almacena el estado actual de la máquina de estados.
   SetpointSubState setpointState; ///< Estado actual del ciclo de control PID.
-  unsigned long lastCycleTime;    ///< Marca de tiempo para el inicio de cada fase.
-  float lastPidOutput;            ///< Almacena la última salida del PID para usarla durante la fase de actuación.
-  // --- TIEMPOS DE CONTROL (ajustables experimentalmente) ---
-  const unsigned long STABILIZATION_TIME_MS = 900; ///< (T_estabilizacion) Tiempo de espera para que la mezcla se homogeneice (10s).
-  const unsigned long ACTUATION_TIME_MS = 100;     ///< (T_ciclo) Duración total del ciclo de actuación de las válvulas (1s).
+  PulseState pulseState;          //< Estado actual del ciclo de pulso de 10ms
+
+  // Tiempos
+  unsigned long lastCycleTime;                     ///< Marca de tiempo para el inicio de cada fase.
+  float lastPidOutput;                             ///< Almacena la última salida del PID para usarla durante la fase de actuación.
+  const unsigned long STABILIZATION_TIME_MS = 400; ///< (T_estabilizacion) Tiempo de espera para que la mezcla se homogeneice (400ms).
+  const unsigned long ACTUATION_TIME_MS = 100;     ///< (T_ciclo) Duración total del ciclo de actuación de las válvulas (100ms).
+  const unsigned long PULSE_CO2 = 10;              // Duración del pulso de 10ms en la electrovalvula de CO2
+
   // El tiempo de muestreo (h) será implícitamente la suma de estos dos.
 };
 
