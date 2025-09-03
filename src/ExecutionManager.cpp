@@ -54,6 +54,9 @@ void ExecutionManager::init()
  */
 void ExecutionManager::run()
 {
+  float currentCO2 = communicationManager.getLastServerData().co2;
+  unsigned long now = millis();
+
   switch (currentState)
   {
   case IDLE:
@@ -63,7 +66,17 @@ void ExecutionManager::run()
 
   case EXECUTING_SETPOINT:
   {
-    unsigned long now = millis();
+    float error = abs(setpoint - communicationManager.getLastServerData().co2);
+    if (error < SETPOINT_DEADBAND_PPM)
+    {
+      Serial.printf("Setpoint alcanzado. Error actual (%.1f ppm) dentro de la banda muerta (%.1f ppm).\n", error, SETPOINT_DEADBAND_PPM);
+      stableStartTime = now;
+      currentState = SETPOINT_STABLE;
+      // Apagamos las válvulas al entrar en estado estable.
+      digitalWrite(VALVE_CO2_PIN, LOW);
+      digitalWrite(VALVE_AIR_PIN, LOW);
+      break; // Salimos del case para que la nueva lógica aplique en el siguiente ciclo.
+    }
 
     // --- Sub-Máquina de Estados del Ciclo de Control ---
     switch (setpointState)
@@ -130,6 +143,27 @@ void ExecutionManager::run()
       }
       break;
     }
+    }
+    break;
+  }
+
+  case SETPOINT_STABLE:
+  {
+    // Estamos en el setpoint. No hacemos nada con las válvulas.
+    // Sin embargo, seguimos monitoreando por si la concentración se "escapa".
+    float error = abs(setpoint - communicationManager.getLastServerData().co2);
+    if (error > SETPOINT_DEADBAND_PPM)
+    {
+      Serial.println("WARN: La concentración ha salido de la banda muerta. Reactivando PID.");
+      // Si el error vuelve a ser grande, reiniciamos el proceso de setpoint.
+      // Esto reiniciará el PID y la sub-máquina de estados.
+      startSetpointProcess(setpoint);
+      break;
+    }
+    if (now - stableStartTime > STABLE_TIMEOUT_MS)
+    {
+      Serial.println("El sistema ha permanecido estable por 1 minuto. Proceso finalizado.");
+      currentState = IDLE; // ¡Volvemos a estar listos para nuevos comandos!
     }
     break;
   }

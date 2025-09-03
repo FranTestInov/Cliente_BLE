@@ -26,6 +26,7 @@ enum SystemState
 {
   IDLE,                  ///< El sistema está en espera, sin realizar ninguna acción.
   EXECUTING_SETPOINT,    ///< El sistema está ejecutando un proceso de control para alcanzar un setpoint de CO2.
+  SETPOINT_STABLE,       ///< El sistema ha alcanzado y estabilizado el setpoint de CO2.
   EXECUTING_CALIBRATION, ///< El sistema está ejecutando una rutina de calibración.
   PULSE,                 ///< El sistema está generando un pulso en la válvula de CO2.
   PANIC_MODE             ///< Estado de emergencia donde se abren todas las válvulas.
@@ -77,8 +78,11 @@ public:
 
 private:
   // Atributos de control
-  int setpoint;                // Para guardar el setpoint del proceso actual
-  PIDController pidController; // Para guardar el setpoint del proceso actual
+  int setpoint;                                  // Para guardar el setpoint del proceso actual
+  PIDController pidController;                   // Para guardar el setpoint del proceso actual
+  const float SETPOINT_DEADBAND_PPM = 50.0;      ///< Banda de tolerancia alrededor del setpoint.
+  unsigned long stableStartTime;                 ///< Marca de tiempo de cuándo se alcanzó la estabilidad.
+  const unsigned long STABLE_TIMEOUT_MS = 60000; ///< 1 minuto para considerar el proceso finalizado.
 
   // Maquinas de estado
   SystemState currentState;       // Almacena el estado actual de la máquina de estados.
@@ -86,11 +90,11 @@ private:
   PulseState pulseState;          //< Estado actual del ciclo de pulso de 10ms
 
   // Tiempos
-  unsigned long lastCycleTime;                     ///< Marca de tiempo para el inicio de cada fase.
-  float lastPidOutput;                             ///< Almacena la última salida del PID para usarla durante la fase de actuación.
-  const unsigned long STABILIZATION_TIME_MS = 400; ///< (T_estabilizacion) Tiempo de espera para que la mezcla se homogeneice (400ms).
-  const unsigned long ACTUATION_TIME_MS = 100;     ///< (T_ciclo) Duración total del ciclo de actuación de las válvulas (100ms).
-  const unsigned long PULSE_CO2 = 10;              // Duración del pulso de 10ms en la electrovalvula de CO2
+  unsigned long lastCycleTime;                      ///< Marca de tiempo para el inicio de cada fase.
+  float lastPidOutput;                              ///< Almacena la última salida del PID para usarla durante la fase de actuación.
+  const unsigned long STABILIZATION_TIME_MS = 1300; ///< (T_estabilizacion) Tiempo de espera para que la mezcla se homogeneice (13s).
+  const unsigned long ACTUATION_TIME_MS = 2000;     ///< (T_ciclo) Duración total del ciclo de actuación de las válvulas (2s).
+  const unsigned long PULSE_CO2 = 10;               // Duración del pulso de 10ms en la electrovalvula de CO2
 
   // El tiempo de muestreo (h) será implícitamente la suma de estos dos.
 };
