@@ -44,7 +44,7 @@ void ExecutionManager::init()
   // --- Sintonizamos el PID con valores iniciales ---
   // Estos valores Kp, Ki, Kd se deben ajustar experimentalmente
   // Salida de 0 a 100 (representando 0% a 100% de tiempo de apertura de válvula)
-  pidController.tune(2.0, 0.5, 0.1, 0, 100);
+  pidController.tune(2.0, 0.5, 0.1, -100, 100);
 
   Serial.println("Execution Manager inicializado.");
 }
@@ -112,22 +112,28 @@ void ExecutionManager::run()
 
     case ACTUATING:
     {
-      // Estamos en la ventana de tiempo para actuar sobre las válvulas.
-
+      digitalWrite(VALVE_CO2_PIN, LOW);
+      digitalWrite(VALVE_AIR_PIN, LOW);
       // Calculamos cuánto tiempo de este ciclo la válvula debe estar abierta.
       long dutyCycleTime = (ACTUATION_TIME_MS * lastPidOutput) / 100;
 
-      if (now - lastCycleTime < dutyCycleTime)
+      if (lastPidOutput > 0)
       {
-        digitalWrite(VALVE_CO2_PIN, HIGH); // Abrimos válvula de CO2
+        // Salida positiva: queremos AÑADIR CO2.
+        dutyCycleTime = (ACTUATION_TIME_MS * lastPidOutput) / 100;
+        if (now - lastCycleTime < dutyCycleTime)
+        {
+          digitalWrite(VALVE_CO2_PIN, HIGH); // Abrimos válvula de CO2
+        }
       }
       else
       {
-        digitalWrite(VALVE_CO2_PIN, LOW); // Cerramos válvula de CO2
-        float currentCO2 = communicationManager.getLastServerData().co2;
-        if (currentCO2 >= setpoint)
+        // Salida negativa: queremos DILUIR CON AIRE.
+        // Usamos el valor absoluto para el cálculo del tiempo.
+        dutyCycleTime = (ACTUATION_TIME_MS * abs(lastPidOutput)) / 100;
+        if (now - lastCycleTime < dutyCycleTime)
         {
-          digitalWrite(VALVE_AIR_PIN, HIGH);
+          digitalWrite(VALVE_AIR_PIN, HIGH); // Abrimos válvula de Aire
         }
       }
 
@@ -171,6 +177,8 @@ void ExecutionManager::run()
   // ... (otros casos como PANIC_MODE se mantienen igual) ...
   case EXECUTING_CALIBRATION:
   {
+    Serial.println("Proceso de calibración finalizado en PCB2. Volviendo a IDLE.");
+    currentState = IDLE; // El trabajo ya se hizo, volvemos a estar disponibles.
     break;
   }
 
@@ -237,13 +245,27 @@ void ExecutionManager::startSetpointProcess(int targetConcentration)
 
 /**
  * @brief Inicia el proceso de calibración del sensor.
+ * @details Esta función ahora simplemente le ordena al CommunicationManager
+ * que envíe el comando de calibración al PCB1 y cambia el estado.
  */
 void ExecutionManager::startCalibrationProcess()
 {
   if (currentState == IDLE)
   {
-    Serial.println("Iniciando proceso de Calibración de Sensor.");
-    currentState = EXECUTING_CALIBRATION;
+    Serial.println("Iniciando proceso de Calibración de Sensor...");
+
+    // Intentamos enviar el comando a través del CommunicationManager.
+    if (communicationManager.sendCalibrationCommand())
+    {
+      Serial.println("Comando de calibración enviado exitosamente.");
+      // Cambiamos a un estado transitorio. En el próximo ciclo de run(), volverá a IDLE.
+      currentState = EXECUTING_CALIBRATION;
+    }
+    else
+    {
+      Serial.println("ERROR: No se pudo enviar el comando de calibración al servidor.");
+      // Si falla, nos mantenemos en IDLE.
+    }
   }
   else
   {

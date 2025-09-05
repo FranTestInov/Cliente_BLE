@@ -67,6 +67,12 @@ public:
   void toggleCooler();
 
   /**
+   * @brief Envía el comando para iniciar el pulso de calibración al servidor BLE.
+   * @return bool `true` si el comando fue enviado, `false` si no hay conexión.
+   */
+  bool sendCalibrationCommand();
+
+  /**
    * @brief Obtiene la última lectura de datos del servidor.
    * @return ServerData Una estructura con los datos más recientes del PCB1.
    */

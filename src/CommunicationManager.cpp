@@ -70,7 +70,7 @@ CommunicationManager::CommunicationManager(ExecutionManager &execManager) : exec
  */
 void CommunicationManager::init()
 {
-  Serial.begin(115200); // Usamos una velocidad más alta
+  Serial.begin(9600); // Usamos una velocidad más alta
   BLEDevice::init("ESP32_BLE_Client");
   // scanForServer();
   Serial.println("Communication Manager inicializado.");
@@ -288,4 +288,26 @@ void CommunicationManager::toggleCooler()
 ServerData CommunicationManager::getLastServerData()
 {
   return lastServerData;
+}
+
+/**
+ * @brief Envía el comando de calibración 'START_CAL' al servidor BLE (PCB1).
+ * @details Verifica si la conexión está activa y la característica de calibración es válida
+ * antes de escribir el comando.
+ * @return bool Devuelve `true` si el comando se envió con éxito, `false` en caso contrario.
+ */
+bool CommunicationManager::sendCalibrationCommand()
+{
+  if (isConnected && pRemoteCharacteristicCalibrate)
+  {
+    Serial.println("Enviando comando 'START_CAL' al servidor...");
+    // Corregido para usar el comando que el servidor espera.
+    pRemoteCharacteristicCalibrate->writeValue("START_CAL", true);
+    return true;
+  }
+  else
+  {
+    Serial.println("WARN: No se puede enviar comando de calibración, no hay conexión BLE.");
+    return false;
+  }
 }

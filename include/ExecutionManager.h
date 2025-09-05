@@ -90,11 +90,11 @@ private:
   PulseState pulseState;          //< Estado actual del ciclo de pulso de 10ms
 
   // Tiempos
-  unsigned long lastCycleTime;                      ///< Marca de tiempo para el inicio de cada fase.
-  float lastPidOutput;                              ///< Almacena la última salida del PID para usarla durante la fase de actuación.
-  const unsigned long STABILIZATION_TIME_MS = 1300; ///< (T_estabilizacion) Tiempo de espera para que la mezcla se homogeneice (13s).
-  const unsigned long ACTUATION_TIME_MS = 2000;     ///< (T_ciclo) Duración total del ciclo de actuación de las válvulas (2s).
-  const unsigned long PULSE_CO2 = 10;               // Duración del pulso de 10ms en la electrovalvula de CO2
+  unsigned long lastCycleTime;                       ///< Marca de tiempo para el inicio de cada fase.
+  float lastPidOutput;                               ///< Almacena la última salida del PID para usarla durante la fase de actuación.
+  const unsigned long STABILIZATION_TIME_MS = 55000; ///< (T_estabilizacion) Tiempo de espera para que la mezcla se homogeneice (13s).
+  const unsigned long ACTUATION_TIME_MS = 200;       ///< (T_ciclo) Duración total del ciclo de actuación de las válvulas (200ms).
+  const unsigned long PULSE_CO2 = 100;               // Duración del pulso de 10ms en la electrovalvula de CO2
 
   // El tiempo de muestreo (h) será implícitamente la suma de estos dos.
 };
