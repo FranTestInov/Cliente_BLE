@@ -133,9 +133,11 @@ void CommunicationManager::handleSerialCommands()
     {
       executionManager.startCalibrationProcess();
     }
-    else if (command == "PULSE")
+    // Aca
+    else if (command.startsWith("PULSE"))
     {
-      executionManager.startPulseProcess();
+      int value = command.substring(command.indexOf('(') + 1, command.indexOf(')')).toInt();
+      executionManager.startPulseProcess(value);
     }
     else if (command == "TOGGLE_COOLER")
     {

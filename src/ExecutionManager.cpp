@@ -278,7 +278,7 @@ void ExecutionManager::startCalibrationProcess()
  * Este metodo se llamara desde CommunicationManager cuando se reciba el comando "PULSE"
  * No interrumpe ningun proceso en curso
  */
-void ExecutionManager::startPulseProcess()
+void ExecutionManager::startPulseProcess(int durationMs)
 {
   if (currentState == IDLE)
   {
@@ -286,6 +286,7 @@ void ExecutionManager::startPulseProcess()
     pulseState = PULSE_START;
     lastCycleTime = millis();
     currentState = PULSE;
+    PULSE_CO2 = durationMs;
   }
   else
   {

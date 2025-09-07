@@ -72,7 +72,7 @@ public:
   void run();
   void startSetpointProcess(int targetConcentration);
   void startCalibrationProcess();
-  void startPulseProcess();
+  void startPulseProcess(int durationMs);
   void triggerPanicMode();
   SystemState getCurrentState(); // Metodo que devuelve un objeto del tipo SystemState
 
@@ -83,6 +83,7 @@ private:
   const float SETPOINT_DEADBAND_PPM = 50.0;      ///< Banda de tolerancia alrededor del setpoint.
   unsigned long stableStartTime;                 ///< Marca de tiempo de cuándo se alcanzó la estabilidad.
   const unsigned long STABLE_TIMEOUT_MS = 60000; ///< 1 minuto para considerar el proceso finalizado.
+  unsigned long PULSE_CO2 = 100;                 // Duración del pulso de 10ms en la electrovalvula de CO2
 
   // Maquinas de estado
   SystemState currentState;       // Almacena el estado actual de la máquina de estados.
@@ -92,9 +93,8 @@ private:
   // Tiempos
   unsigned long lastCycleTime;                       ///< Marca de tiempo para el inicio de cada fase.
   float lastPidOutput;                               ///< Almacena la última salida del PID para usarla durante la fase de actuación.
-  const unsigned long STABILIZATION_TIME_MS = 55000; ///< (T_estabilizacion) Tiempo de espera para que la mezcla se homogeneice (13s).
+  const unsigned long STABILIZATION_TIME_MS = 55000; ///< (T_estabilizacion) Tiempo de espera para que la mezcla se homogeneice (55s).
   const unsigned long ACTUATION_TIME_MS = 200;       ///< (T_ciclo) Duración total del ciclo de actuación de las válvulas (200ms).
-  const unsigned long PULSE_CO2 = 100;               // Duración del pulso de 10ms en la electrovalvula de CO2
 
   // El tiempo de muestreo (h) será implícitamente la suma de estos dos.
 };
