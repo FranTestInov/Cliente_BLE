@@ -8,7 +8,8 @@
  */
 
 #include "CommunicationManager.h"
-
+#include "PIDController.h"
+#if !defined(SIMULATION_MODE)
 // --- UUIDs y otras definiciones de BLE ---
 #define SERVICE_UUID "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
 #define CHARACTERISTIC_UUID_TMP "beb5483e-36e1-4688-b7f5-ea07361b26a8"
@@ -55,6 +56,8 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
   }
 };
 
+#endif
+
 // --- Implementación de la Clase ---
 
 /**
@@ -70,9 +73,19 @@ CommunicationManager::CommunicationManager(ExecutionManager &execManager) : exec
  */
 void CommunicationManager::init()
 {
-  Serial.begin(9600); // Usamos una velocidad más alta
+  Serial.begin(115200); // Usamos una velocidad más alta
+#if defined(SIMULATION_MODE)
+  Serial.println("**********************************");
+  Serial.println("* Communication Manager en MODO SIMULACIÓN *");
+  Serial.println("**********************************");
+  // En modo simulación, inicializamos los valores base.
+  lastServerData.co2 = 450;
+  lastServerData.temperature = 25.0;
+  lastServerData.humidity = 50.0;
+  lastServerData.pressure = 1013.25;
+#else
   BLEDevice::init("ESP32_BLE_Client");
-  // scanForServer();
+#endif
   Serial.println("Communication Manager inicializado.");
 }
 
@@ -83,102 +96,84 @@ void CommunicationManager::init()
  */
 void CommunicationManager::run()
 {
-  // 1. Gestionar conexión BLE
+#if defined(SIMULATION_MODE)
+  // --- LÓGICA DE SIMULACIÓN ---
+  if (millis() - lastSensorReadTime > 1000)
+  { // Actualizamos datos 1 vez por segundo
+    lastSensorReadTime = millis();
+    simulateServerData();
+  }
+#else
+  // --- LÓGICA REAL CON BLE ---
   if (!isConnected && !deviceFound && !isScanning)
   {
     scanForServer();
   }
-
   if (!isConnected && deviceFound)
   {
     connectToServer();
   }
-
-  // 2. Leer sensores periódicamente si estamos conectados
   if (isConnected && millis() - lastSensorReadTime > 1000)
   {
     lastSensorReadTime = millis();
     readServerData();
   }
+#endif
 
-  // 3. Revisar si hay comandos nuevos desde el PC
+  // Esta parte es común para ambos modos
   handleSerialCommands();
-
-  // 4. Enviar siempre el estado actual y los datos al PC
   sendStatusToPC();
 }
 
+#if defined(SIMULATION_MODE)
 /**
- * @brief Maneja los comandos recibidos por el puerto serie.
- *
- * Interpreta y ejecuta comandos como SET_CO2, CALIBRATE_SENSOR y OPEN_ALL.
+ * @brief Genera datos de sensores simulados que se comportan de forma realista.
+ * @details Esta función se llama periódicamente en el modo de simulación para
+ * actualizar los valores de los sensores basándose en el estado actual del
+ * ExecutionManager, creando curvas y comportamientos lógicos para la GUI.
  */
-void CommunicationManager::handleSerialCommands()
+void CommunicationManager::simulateServerData()
 {
-  if (Serial.available() > 0)
+  SystemState currentState = executionManager.getCurrentState();
+  int setpoint = executionManager.getSetpoint(); // Necesitarás añadir esta función a ExecutionManager
+
+  // Simular Temperatura, Humedad y Presión con una leve fluctuación
+  lastServerData.temperature = 25.0 + (sin(millis() / 5000.0) * 0.5); // Oscila +/- 0.5 grados
+  lastServerData.humidity = 50.0 + (cos(millis() / 7000.0) * 2.0);    // Oscila +/- 2%
+  lastServerData.pressure = 1013.25 + (sin(millis() / 3000.0) * 1.0); // Oscila +/- 1 hPa
+
+  // Simular el CO2 basado en el estado
+  switch (currentState)
   {
-    String command = Serial.readStringUntil('\n');
-    command.trim();
-
-    Serial.print("Comando recibido: ");
-    Serial.println(command);
-
-    if (command.startsWith("SET_CO2"))
-    {
-      // Extraemos el valor entre paréntesis
-      int value = command.substring(command.indexOf('(') + 1, command.indexOf(')')).toInt();
-      executionManager.startSetpointProcess(value);
-    }
-    else if (command == "CALIBRATE_SENSOR")
-    {
-      executionManager.startCalibrationProcess();
-    }
-    // Aca
-    else if (command.startsWith("PULSE"))
-    {
-      int value = command.substring(command.indexOf('(') + 1, command.indexOf(')')).toInt();
-      executionManager.startPulseProcess(value);
-    }
-    else if (command == "TOGGLE_COOLER")
-    {
-      toggleCooler();
-    }
-    else if (command == "OPEN_ALL")
-    {
-      executionManager.triggerPanicMode();
-    }
-    else
-    {
-      Serial.println("ERROR: Comando no reconocido");
-    }
+  case EXECUTING_SETPOINT:
+    // Hacemos que el CO2 se acerque suavemente al setpoint
+    lastServerData.co2 += (setpoint - lastServerData.co2) * 0.1;
+    lastServerData.systemState = "READY";
+    break;
+  case PURGING_WITH_AIR:
+    // Hacemos que el CO2 baje suavemente a 450 ppm
+    lastServerData.co2 += (450 - lastServerData.co2) * 0.1;
+    lastServerData.systemState = "READY";
+    break;
+  case EXECUTING_CALIBRATION:
+    lastServerData.systemState = "CALIBRATING";
+    break;
+  case IDLE:
+  case SETPOINT_STABLE:
+  default:
+    // En reposo, se mantiene cerca de 450 ppm
+    if (lastServerData.co2 < 445)
+      lastServerData.co2 = 450;
+    if (lastServerData.co2 > 455)
+      lastServerData.co2 = 450;
+    lastServerData.systemState = "READY";
+    break;
   }
-}
 
-/**
- * @brief Envía el estado actual y los datos de sensores al PC por el puerto serie.
- *
- * El formato es: "STATUS:[estado];TEMP:[val];HUM:[val];PRES:[val];CO2:[val]\n"
- */
-void CommunicationManager::sendStatusToPC()
-{
-  // Formato: "STATUS:[estado];TEMP:[val];HUM:[val];PRES:[val];CO2:[val]\n"
-  // Este formato es fácil de procesar en la aplicación de Python
-  String statusStr = "PCB2_STATE:" + String(executionManager.getCurrentState()) + ";";
-  statusStr += "TEMP:" + String(lastServerData.temperature, 2) + ";";
-  statusStr += "HUM:" + String(lastServerData.humidity, 2) + ";";
-  statusStr += "PRES:" + String(lastServerData.pressure, 2) + ";";
-  statusStr += "CO2:" + String(lastServerData.co2);
-  statusStr += "PCB1_STATE:" + lastServerData.systemState + ";";
-  statusStr += "COOLER:" + lastServerData.coolerState;
-
-  // Usamos un temporizador para no saturar el puerto serie
-  static unsigned long lastStatusSendTime = 0;
-  if (millis() - lastStatusSendTime > 500)
-  { // Enviamos estado 2 veces por segundo
-    lastStatusSendTime = millis();
-    Serial.println(statusStr);
-  }
+  // Simular el estado del cooler (puedes hacerlo más complejo si quieres)
+  lastServerData.coolerState = "ON";
 }
+#else
 
 // --- Métodos de BLE ---
 
@@ -311,5 +306,78 @@ bool CommunicationManager::sendCalibrationCommand()
   {
     Serial.println("WARN: No se puede enviar comando de calibración, no hay conexión BLE.");
     return false;
+  }
+}
+
+#endif
+/**
+ * @brief Maneja los comandos recibidos por el puerto serie.
+ *
+ * Interpreta y ejecuta comandos como SET_CO2, CALIBRATE_SENSOR y OPEN_ALL.
+ */
+void CommunicationManager::handleSerialCommands()
+{
+  if (Serial.available() > 0)
+  {
+    String command = Serial.readStringUntil('\n');
+    command.trim();
+
+    Serial.print("Comando recibido: ");
+    Serial.println(command);
+
+    if (command.startsWith("SET_CO2"))
+    {
+      // Extraemos el valor entre paréntesis
+      int value = command.substring(command.indexOf('(') + 1, command.indexOf(')')).toInt();
+      executionManager.startSetpointProcess(value);
+    }
+    else if (command == "CALIBRATE_SENSOR")
+    {
+      executionManager.startCalibrationProcess();
+    }
+    // Aca
+    else if (command.startsWith("PULSE"))
+    {
+      int value = command.substring(command.indexOf('(') + 1, command.indexOf(')')).toInt();
+      executionManager.startPulseProcess(value);
+    }
+    else if (command == "TOGGLE_COOLER")
+    {
+      toggleCooler();
+    }
+    else if (command == "OPEN_ALL")
+    {
+      executionManager.triggerPanicMode();
+    }
+    else
+    {
+      Serial.println("ERROR: Comando no reconocido");
+    }
+  }
+}
+
+/**
+ * @brief Envía el estado actual y los datos de sensores al PC por el puerto serie.
+ *
+ * El formato es: "STATUS:[estado];TEMP:[val];HUM:[val];PRES:[val];CO2:[val]\n"
+ */
+void CommunicationManager::sendStatusToPC()
+{
+  // Formato: "STATUS:[estado];TEMP:[val];HUM:[val];PRES:[val];CO2:[val]\n"
+  // Este formato es fácil de procesar en la aplicación de Python
+  String statusStr = "PCB2_STATE:" + String(executionManager.getCurrentState()) + ";";
+  statusStr += "TEMP:" + String(lastServerData.temperature, 2) + ";";
+  statusStr += "HUM:" + String(lastServerData.humidity, 2) + ";";
+  statusStr += "PRES:" + String(lastServerData.pressure, 2) + ";";
+  statusStr += "CO2:" + String(lastServerData.co2);
+  statusStr += "PCB1_STATE:" + lastServerData.systemState + ";";
+  statusStr += "COOLER:" + lastServerData.coolerState;
+
+  // Usamos un temporizador para no saturar el puerto serie
+  static unsigned long lastStatusSendTime = 0;
+  if (millis() - lastStatusSendTime > 500)
+  { // Enviamos estado 2 veces por segundo
+    lastStatusSendTime = millis();
+    Serial.println(statusStr);
   }
 }

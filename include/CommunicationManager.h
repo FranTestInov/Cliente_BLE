@@ -113,6 +113,19 @@ private:
    * @brief Lee todas las características de los sensores del servidor BLE.
    */
   void readServerData();
+#if defined(SIMULATION_MODE)
+  /**
+   * @brief Genera datos de sensores falsos para el modo de simulación.
+   */
+  void simulateServerData();
+#else
+  // --- Métodos y Atributos de BLE (solo se usan en modo real) ---
+  bool isConnected = false;
+  bool isScanning = false;
+  void connectToServer();
+  void scanForServer();
+  void readServerData();
+#endif
 };
 
 extern CommunicationManager communicationManager;
