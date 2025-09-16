@@ -84,6 +84,7 @@ private:
   ServerData lastServerData;            ///< Almacena los últimos datos leídos de los sensores.
   unsigned long lastSensorReadTime = 0; ///< Marca de tiempo para controlar la frecuencia de lectura de sensores.
 
+  int serialdatatimer = 1000; // Datos cada 1 segundo
   // --- Métodos Privados de Gestión ---
   /**
    * @brief Procesa comandos entrantes desde el PC a través del puerto serie.

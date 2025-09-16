@@ -1,6 +1,9 @@
 #ifndef PID_CONTROLLER_H
 #define PID_CONTROLLER_H
 
+#define SIMULATION_MODE false // Cambiar a true para activar el modo simulador (sin BLE)
+
+
 class PIDController {
 public:
   PIDController();

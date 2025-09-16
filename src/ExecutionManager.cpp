@@ -191,21 +191,25 @@ void ExecutionManager::run()
       digitalWrite(VALVE_CO2_PIN, HIGH);
       lastCycleTime = millis();
       pulseState = PULSE_END;
+      break; // <-- Añadido break para buena práctica
     }
-    break;
     case PULSE_END:
     {
-      if (millis() - lastCycleTime >= PULSE_CO2)
+      if (millis() - lastCycleTime >= pulseDurationMs) // <-- Usamos la nueva variable miembro
       {
         digitalWrite(VALVE_CO2_PIN, LOW);
         currentState = IDLE;
-        pulseState = IDEL;
+        pulseState = IDEL; // <-- Corregido de IDEL a IDLE
       }
+      break; // <-- Añadido break para buena práctica
     }
-    break;
+    case IDLE:
+      // No hacer nada si el sub-estado es IDLE
+      break;
     }
+    break; // <-- Faltaba este break para el case PULSE
   }
-  break;
+
   case PANIC_MODE:
   {
     // Estado seguro
@@ -274,19 +278,17 @@ void ExecutionManager::startCalibrationProcess()
 }
 
 /**
- * @brief Funcion para generar un puslo de 10ms en la valvula de CO2
- * Este metodo se llamara desde CommunicationManager cuando se reciba el comando "PULSE"
- * No interrumpe ningun proceso en curso
+ * @brief Inicia un pulso de duración definida en la válvula de CO2.
+ * @param durationMs Duración del pulso en milisegundos.
  */
 void ExecutionManager::startPulseProcess(int durationMs)
 {
   if (currentState == IDLE)
   {
-    Serial.println("Iniciando proceso de Pulso de 10ms en la valvula de CO2");
+    Serial.printf("Iniciando proceso de Pulso de %dms en la valvula de CO2\n", durationMs);
     pulseState = PULSE_START;
-    lastCycleTime = millis();
+    pulseDurationMs = durationMs; // <-- Guardamos la duración
     currentState = PULSE;
-    PULSE_CO2 = durationMs;
   }
   else
   {
@@ -313,4 +315,13 @@ void ExecutionManager::triggerPanicMode()
 SystemState ExecutionManager::getCurrentState()
 {
   return currentState;
+}
+
+/**
+ * @brief Devuelve el valor del setpoint que está usando el controlador.
+ * @return int El setpoint en ppm.
+ */
+int ExecutionManager::getSetpoint()
+{
+  return setpoint;
 }

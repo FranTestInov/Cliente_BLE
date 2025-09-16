@@ -125,6 +125,57 @@ void CommunicationManager::run()
   sendStatusToPC();
 }
 
+/**
+ * @brief Envía el comando para alternar el estado del cooler al servidor BLE.
+ * @details Escribe un valor genérico en la característica del cooler para
+ * solicitar un cambio de estado en el PCB1.
+ */
+void CommunicationManager::toggleCooler()
+{
+#if !defined(SIMULATION_MODE)
+  if (isConnected && pRemoteCharacteristicCoolerState)
+  {
+    Serial.println("Enviando comando para alternar el cooler al servidor...");
+    pRemoteCharacteristicCoolerState->writeValue("1", 1);
+  }
+  else
+  {
+    Serial.println("WARN: No se puede alternar el cooler, no hay conexión BLE.");
+  }
+#endif
+}
+/**
+ * @brief Envía el comando de calibración 'START_CAL' al servidor BLE (PCB1).
+ * @return bool Devuelve `true` si el comando se envió con éxito, `false` en caso contrario.
+ */
+bool CommunicationManager::sendCalibrationCommand()
+{
+#if !defined(SIMULATION_MODE)
+  if (isConnected && pRemoteCharacteristicCalibrate)
+  {
+    Serial.println("Enviando comando 'START_CAL' al servidor...");
+    return pRemoteCharacteristicCalibrate->writeValue("START_CAL", true);
+  }
+  else
+  {
+    Serial.println("WARN: No se puede enviar comando de calibración, no hay conexión BLE.");
+    return false;
+  }
+#else
+  // En modo simulación, siempre tenemos éxito.
+  return true;
+#endif
+}
+
+/**
+ * @brief Obtiene la última estructura de datos leída del servidor.
+ * @return ServerData Una copia de la última estructura de datos recibida.
+ */
+ServerData CommunicationManager::getLastServerData()
+{
+  return lastServerData;
+}
+
 #if defined(SIMULATION_MODE)
 /**
  * @brief Genera datos de sensores simulados que se comportan de forma realista.
@@ -369,13 +420,13 @@ void CommunicationManager::sendStatusToPC()
   statusStr += "TEMP:" + String(lastServerData.temperature, 2) + ";";
   statusStr += "HUM:" + String(lastServerData.humidity, 2) + ";";
   statusStr += "PRES:" + String(lastServerData.pressure, 2) + ";";
-  statusStr += "CO2:" + String(lastServerData.co2);
+  statusStr += "CO2:" + String(lastServerData.co2) + ";";
   statusStr += "PCB1_STATE:" + lastServerData.systemState + ";";
   statusStr += "COOLER:" + lastServerData.coolerState;
 
   // Usamos un temporizador para no saturar el puerto serie
   static unsigned long lastStatusSendTime = 0;
-  if (millis() - lastStatusSendTime > 500)
+  if (millis() - lastStatusSendTime > serialdatatimer)
   { // Enviamos estado 2 veces por segundo
     lastStatusSendTime = millis();
     Serial.println(statusStr);

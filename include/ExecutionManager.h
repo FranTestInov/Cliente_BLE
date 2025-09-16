@@ -29,7 +29,10 @@ enum SystemState
   SETPOINT_STABLE,       ///< El sistema ha alcanzado y estabilizado el setpoint de CO2.
   EXECUTING_CALIBRATION, ///< El sistema está ejecutando una rutina de calibración.
   PULSE,                 ///< El sistema está generando un pulso en la válvula de CO2.
-  PANIC_MODE             ///< Estado de emergencia donde se abren todas las válvulas.
+  PANIC_MODE,            ///< Estado de emergencia donde se abren todas las válvulas.
+
+  // Modo del simulador
+  PURGING_WITH_AIR
 };
 
 /**
@@ -76,6 +79,12 @@ public:
   void triggerPanicMode();
   SystemState getCurrentState(); // Metodo que devuelve un objeto del tipo SystemState
 
+  /**
+   * @brief Obtiene el setpoint de CO2 actual.
+   * @return int El valor del setpoint actual en ppm.
+   */
+  int getSetpoint();
+
 private:
   // Atributos de control
   int setpoint;                                  // Para guardar el setpoint del proceso actual
@@ -84,6 +93,10 @@ private:
   unsigned long stableStartTime;                 ///< Marca de tiempo de cuándo se alcanzó la estabilidad.
   const unsigned long STABLE_TIMEOUT_MS = 60000; ///< 1 minuto para considerar el proceso finalizado.
   unsigned long PULSE_CO2 = 100;                 // Duración del pulso de 10ms en la electrovalvula de CO2
+
+  // Simulación
+  //  --- Atributos para el proceso de Pulso ---
+  unsigned long pulseDurationMs; ///< Duración del pulso a generar, en ms.
 
   // Maquinas de estado
   SystemState currentState;       // Almacena el estado actual de la máquina de estados.
