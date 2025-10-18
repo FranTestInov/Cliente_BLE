@@ -17,7 +17,7 @@
 #define VALVE_CO2_PIN 25      ///< Pin para controlar la válvula de CO2.
 #define VALVE_AIR_PIN 26      ///< Pin para controlar la válvula de Aire.
 #define VALVE_EXTERIOR_PIN 27 ///< Pin para controlar la válvula que conecta la atmosfera.
-#define MINI_PUMP 33          ///< Pin para controlar la mini bomba
+#define MINI_PUMP 32          ///< Pin para controlar la mini bomba
 
 /**
  * @enum SystemState

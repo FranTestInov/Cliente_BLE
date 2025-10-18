@@ -6,19 +6,21 @@
 ExecutionManager executionManager;
 CommunicationManager communicationManager(executionManager); // Le pasamos el executionManager
 
-void setup() {
+void setup()
+{
   // Espera a que el puerto serial se conecte para no perder mensajes iniciales
-  //while (!Serial); 
+  // while (!Serial);
   delay(2000);
 
   // Inicializamos cada uno de nuestros managers
   executionManager.init();
   communicationManager.init();
-  
+
   Serial.println("Sistema PCB2 inicializado y listo.");
 }
 
-void loop() {
+void loop()
+{
   // Simplemente ejecutamos los bucles de nuestros managers
   communicationManager.run();
   executionManager.run();
