@@ -71,7 +71,7 @@ void ExecutionManager::run()
   case EXECUTING_SETPOINT:
   {
     float error = abs(setpoint - communicationManager.getLastServerData().co2);
-    if (error < SETPOINT_DEADBAND_PPM)
+    if (error < SETPOINT_DEADBAND_PPM && lastPidOutput < 0)
     {
       Serial.printf("Setpoint alcanzado. Error actual (%.1f ppm) dentro de la banda muerta (%.1f ppm).\n", error, SETPOINT_DEADBAND_PPM);
       stableStartTime = now;
