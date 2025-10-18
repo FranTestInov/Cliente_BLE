@@ -34,12 +34,14 @@ void ExecutionManager::init()
 {
   pinMode(VALVE_CO2_PIN, OUTPUT);
   pinMode(VALVE_AIR_PIN, OUTPUT);
-  pinMode(VALVE_VACUUM_PIN, OUTPUT);
+  pinMode(VALVE_EXTERIOR_PIN, OUTPUT);
+  pinMode(MINI_PUMP, OUTPUT);
 
   // Asegurarse de que todas las válvulas comiencen cerradas (suponiendo lógica activa en alto)
   digitalWrite(VALVE_CO2_PIN, LOW);
   digitalWrite(VALVE_AIR_PIN, LOW);
-  digitalWrite(VALVE_VACUUM_PIN, LOW);
+  digitalWrite(VALVE_EXTERIOR_PIN, LOW);
+  digitalWrite(MINI_PUMP, LOW);
 
   // --- Sintonizamos el PID con valores iniciales ---
   // Estos valores Kp, Ki, Kd se deben ajustar experimentalmente
@@ -62,6 +64,8 @@ void ExecutionManager::run()
   case IDLE:
     digitalWrite(VALVE_CO2_PIN, LOW);
     digitalWrite(VALVE_AIR_PIN, LOW);
+    digitalWrite(VALVE_EXTERIOR_PIN, LOW);
+    digitalWrite(MINI_PUMP, LOW);
     break;
 
   case EXECUTING_SETPOINT:
@@ -72,9 +76,13 @@ void ExecutionManager::run()
       Serial.printf("Setpoint alcanzado. Error actual (%.1f ppm) dentro de la banda muerta (%.1f ppm).\n", error, SETPOINT_DEADBAND_PPM);
       stableStartTime = now;
       currentState = SETPOINT_STABLE;
+      setpointState = MEASURING;
       // Apagamos las válvulas al entrar en estado estable.
       digitalWrite(VALVE_CO2_PIN, LOW);
       digitalWrite(VALVE_AIR_PIN, LOW);
+      digitalWrite(VALVE_EXTERIOR_PIN, LOW);
+      digitalWrite(MINI_PUMP, LOW);
+      Serial.printf("Cerramos todas las valvulas, apagamos la bomba");
       break; // Salimos del case para que la nueva lógica aplique en el siguiente ciclo.
     }
 
@@ -98,7 +106,7 @@ void ExecutionManager::run()
       // Leemos el valor estabilizado del sensor.
       float currentCO2 = communicationManager.getLastServerData().co2;
 
-      // Calculamos la nueva salida del PID (0-100) y la guardamos.
+      // Calculamos la salida del PID (-100 a 100) y la guardamos.
       lastPidOutput = pidController.compute(setpoint, currentCO2);
 
       // Informamos por serial para depuración.
@@ -112,38 +120,46 @@ void ExecutionManager::run()
 
     case ACTUATING:
     {
-      digitalWrite(VALVE_CO2_PIN, LOW);
-      digitalWrite(VALVE_AIR_PIN, LOW);
-      // Calculamos cuánto tiempo de este ciclo la válvula debe estar abierta.
-      long dutyCycleTime = (ACTUATION_TIME_MS * lastPidOutput) / 100;
-
       if (lastPidOutput > 0)
-      {
+      { // Inyectar CO2
+
+        digitalWrite(VALVE_AIR_PIN, LOW);      // Cierra la valvula de aire
+        digitalWrite(VALVE_EXTERIOR_PIN, LOW); // Cierra la valvula de exterior
+        digitalWrite(MINI_PUMP, LOW);          // Apaga la bomba
+        Serial.printf("Cerramos las valvulas de aire y exterior, apagamos la bomba");
+
         // Salida positiva: queremos AÑADIR CO2.
-        dutyCycleTime = (ACTUATION_TIME_MS * lastPidOutput) / 100;
+        // Calcula cuánto tiempo de este ciclo la válvula debe estar abierta.
+        long dutyCycleTime = (ACTUATION_TIME_MS * lastPidOutput) / 100;
+
         if (now - lastCycleTime < dutyCycleTime)
-        {
+        {                                    // Si todavía no termino el tiempo
           digitalWrite(VALVE_CO2_PIN, HIGH); // Abrimos válvula de CO2
+          Serial.printf("Abrimos la valvula de CO2");
+        }
+        else
+        {                                   // Paso el tiempo y hay que cerrar
+          digitalWrite(VALVE_CO2_PIN, LOW); // Cerramos válvula de CO2
+          Serial.printf("Cerramos la valvula de CO2");
         }
       }
       else
-      {
-        // Salida negativa: queremos DILUIR CON AIRE.
-        // Usamos el valor absoluto para el cálculo del tiempo.
-        dutyCycleTime = (ACTUATION_TIME_MS * abs(lastPidOutput)) / 100;
-        if (now - lastCycleTime < dutyCycleTime)
-        {
-          digitalWrite(VALVE_AIR_PIN, HIGH); // Abrimos válvula de Aire
-        }
+      { // Bajar concentración
+        // Por seguridad cerramos la valvula de CO2
+        digitalWrite(VALVE_CO2_PIN, LOW); // Cerramos válvula de CO2
+        Serial.printf("Cerramos la valvula de CO2");
+
+        // Salida negativa: queremos bajar la concentración.
+        // tenemos que abrir las valvulas de aire y la del exterior y prender la bomba
+        digitalWrite(VALVE_AIR_PIN, HIGH);      // Cierra la valvula de aire
+        digitalWrite(VALVE_EXTERIOR_PIN, HIGH); // Cierra la valvula de exterior
+        digitalWrite(MINI_PUMP, HIGH);
+        Serial.printf("Abrimos la valvula de aire y la de exterior, prendemos la bombita");
       }
 
       // Verificamos si el ciclo de actuación ha terminado.
       if (now - lastCycleTime >= ACTUATION_TIME_MS)
       {
-        // El ciclo de actuación terminó, cerramos la válvula por si acaso
-        // y pasamos a la fase de estabilización.
-        digitalWrite(VALVE_CO2_PIN, LOW);
-        digitalWrite(VALVE_AIR_PIN, LOW);
         lastCycleTime = now;
         setpointState = MEASURING;
       }
@@ -156,7 +172,7 @@ void ExecutionManager::run()
   case SETPOINT_STABLE:
   {
     // Estamos en el setpoint. No hacemos nada con las válvulas.
-    // Sin embargo, seguimos monitoreando por si la concentración se "escapa".
+    // Sin embargo, seguimos monitoreando por si la concentración sigue bajando.
     float error = abs(setpoint - communicationManager.getLastServerData().co2);
     if (error > SETPOINT_DEADBAND_PPM)
     {
@@ -168,16 +184,15 @@ void ExecutionManager::run()
     }
     if (now - stableStartTime > STABLE_TIMEOUT_MS)
     {
-      Serial.println("El sistema ha permanecido estable por 1 minuto. Proceso finalizado.");
-      currentState = IDLE; // ¡Volvemos a estar listos para nuevos comandos!
+      Serial.println("El sistema ha permanecido estable por 2 minuto. Proceso finalizado.");
+      currentState = IDLE; // ¡Volvemos al estdo IDLE para recibir nuevos comandos!
     }
     break;
   }
-
-  // ... (otros casos como PANIC_MODE se mantienen igual) ...
   case EXECUTING_CALIBRATION:
   {
     Serial.println("Proceso de calibración finalizado en PCB2. Volviendo a IDLE.");
+    // Aca le podría poner un delay de 1,5 segundos para que se muestre en el estaado del HMI
     currentState = IDLE; // El trabajo ya se hizo, volvemos a estar disponibles.
     break;
   }
@@ -211,7 +226,8 @@ void ExecutionManager::run()
     // Estado seguro
     digitalWrite(VALVE_CO2_PIN, LOW);
     digitalWrite(VALVE_AIR_PIN, HIGH);
-    digitalWrite(VALVE_VACUUM_PIN, HIGH);
+    digitalWrite(VALVE_EXTERIOR_PIN, HIGH);
+    digitalWrite(MINI_PUMP, HIGH);
     break;
   }
   }
@@ -232,9 +248,9 @@ void ExecutionManager::startSetpointProcess(int targetConcentration)
     setpoint = targetConcentration;
 
     // Preparamos el controlador para un nuevo proceso.
-    pidController.reset();     // Reseteamos el PID
-    setpointState = MEASURING; // Empezamos en la fase de medición/estabilización.
-    lastCycleTime = millis();  // Iniciamos el primer temporizador.
+    pidController.reset();       // Reseteamos el PID
+    setpointState = CALCULATING; // Empezamos en la fase de calculo.
+    lastCycleTime = millis();    // Iniciamos el primer temporizador.
     currentState = EXECUTING_SETPOINT;
   }
   else
@@ -253,7 +269,6 @@ void ExecutionManager::startCalibrationProcess()
   if (currentState == IDLE)
   {
     Serial.println("Iniciando proceso de Calibración de Sensor...");
-
     // Intentamos enviar el comando a través del CommunicationManager.
     if (communicationManager.sendCalibrationCommand())
     {

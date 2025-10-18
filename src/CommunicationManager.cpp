@@ -70,7 +70,7 @@ CommunicationManager::CommunicationManager(ExecutionManager &execManager) : exec
  */
 void CommunicationManager::init()
 {
-  Serial.begin(9600); // Usamos una velocidad más alta
+  Serial.begin(115200); // Usamos una velocidad más alta
   BLEDevice::init("ESP32_BLE_Client");
   // scanForServer();
   Serial.println("Communication Manager inicializado.");
@@ -133,7 +133,6 @@ void CommunicationManager::handleSerialCommands()
     {
       executionManager.startCalibrationProcess();
     }
-    // Aca
     else if (command.startsWith("PULSE"))
     {
       int value = command.substring(command.indexOf('(') + 1, command.indexOf(')')).toInt();
@@ -167,7 +166,7 @@ void CommunicationManager::sendStatusToPC()
   statusStr += "TEMP:" + String(lastServerData.temperature, 2) + ";";
   statusStr += "HUM:" + String(lastServerData.humidity, 2) + ";";
   statusStr += "PRES:" + String(lastServerData.pressure, 2) + ";";
-  statusStr += "CO2:" + String(lastServerData.co2);
+  statusStr += "CO2:" + String(lastServerData.co2) + ";";
   statusStr += "PCB1_STATE:" + lastServerData.systemState + ";";
   statusStr += "COOLER:" + lastServerData.coolerState;
 

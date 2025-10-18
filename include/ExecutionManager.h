@@ -14,9 +14,10 @@
 #include "PIDController.h"
 
 // --- Definición de pines para las válvulas ---
-#define VALVE_CO2_PIN 25    ///< Pin para controlar la válvula de CO2.
-#define VALVE_AIR_PIN 26    ///< Pin para controlar la válvula de Aire.
-#define VALVE_VACUUM_PIN 27 ///< Pin para controlar la válvula de Vacío.
+#define VALVE_CO2_PIN 25      ///< Pin para controlar la válvula de CO2.
+#define VALVE_AIR_PIN 26      ///< Pin para controlar la válvula de Aire.
+#define VALVE_EXTERIOR_PIN 27 ///< Pin para controlar la válvula que conecta la atmosfera.
+#define MINI_PUMP 33          ///< Pin para controlar la mini bomba
 
 /**
  * @enum SystemState
@@ -78,12 +79,12 @@ public:
 
 private:
   // Atributos de control
-  int setpoint;                                  // Para guardar el setpoint del proceso actual
-  PIDController pidController;                   // Para guardar el setpoint del proceso actual
-  const float SETPOINT_DEADBAND_PPM = 50.0;      ///< Banda de tolerancia alrededor del setpoint.
-  unsigned long stableStartTime;                 ///< Marca de tiempo de cuándo se alcanzó la estabilidad.
-  const unsigned long STABLE_TIMEOUT_MS = 60000; ///< 1 minuto para considerar el proceso finalizado.
-  unsigned long PULSE_CO2 = 100;                 // Duración del pulso de 10ms en la electrovalvula de CO2
+  int setpoint;                                   // Para guardar el setpoint del proceso actual
+  PIDController pidController;                    // Para guardar el setpoint del proceso actual
+  unsigned long stableStartTime;                  // Marca de tiempo de cuándo se alcanzó la estabilidad.
+  const unsigned long STABLE_TIMEOUT_MS = 120000; // 2 minuto para considerar el setpoint estable.
+  const float SETPOINT_DEADBAND_PPM = 50.0;       // Banda de tolerancia alrededor del setpoint.
+  unsigned long PULSE_CO2 = 50;                   // Duración del pulso de 50ms en la electrovalvula de CO2
 
   // Maquinas de estado
   SystemState currentState;       // Almacena el estado actual de la máquina de estados.
@@ -91,10 +92,10 @@ private:
   PulseState pulseState;          //< Estado actual del ciclo de pulso de 10ms
 
   // Tiempos
-  unsigned long lastCycleTime;                       ///< Marca de tiempo para el inicio de cada fase.
-  float lastPidOutput;                               ///< Almacena la última salida del PID para usarla durante la fase de actuación.
-  const unsigned long STABILIZATION_TIME_MS = 55000; ///< (T_estabilizacion) Tiempo de espera para que la mezcla se homogeneice (55s).
-  const unsigned long ACTUATION_TIME_MS = 200;       ///< (T_ciclo) Duración total del ciclo de actuación de las válvulas (200ms).
+  unsigned long lastCycleTime;                        ///< Marca de tiempo para el inicio de cada fase.
+  float lastPidOutput;                                ///< Almacena la última salida del PID para usarla durante la fase de actuación.
+  const unsigned long STABILIZATION_TIME_MS = 120000; ///< (T_estabilizacion) Tiempo de espera para que la mezcla se homogeneice (120s).
+  const uint8_t ACTUATION_TIME_MS = 50;               ///< (T_ciclo) Duración total del ciclo de actuación de las válvulas de CO2(50ms).
 
   // El tiempo de muestreo (h) será implícitamente la suma de estos dos.
 };
