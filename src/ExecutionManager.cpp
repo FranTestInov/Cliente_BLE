@@ -71,7 +71,7 @@ void ExecutionManager::run()
   case EXECUTING_SETPOINT:
   {
     float error = abs(setpoint - communicationManager.getLastServerData().co2);
-    if (error < SETPOINT_DEADBAND_PPM && lastPidOutput < 0)
+    if (error < SETPOINT_DEADBAND_PPM)
     {
       Serial.printf("Setpoint alcanzado. Error actual (%.1f ppm) dentro de la banda muerta (%.1f ppm).\n", error, SETPOINT_DEADBAND_PPM);
       stableStartTime = now;
@@ -83,7 +83,7 @@ void ExecutionManager::run()
       digitalWrite(VALVE_EXTERIOR_PIN, LOW);
       digitalWrite(MINI_PUMP, LOW);
       Serial.printf("Cerramos todas las valvulas, apagamos la bomba");
-      break; // Salimos del case para que la nueva lógica aplique en el siguiente ciclo.
+      break; // Salimos del case para que la lógica aplique en el siguiente ciclo.
     }
 
     // --- Sub-Máquina de Estados del Ciclo de Control ---
@@ -179,6 +179,8 @@ void ExecutionManager::run()
       Serial.println("WARN: La concentración ha salido de la banda muerta. Reactivando PID.");
       // Si el error vuelve a ser grande, reiniciamos el proceso de setpoint.
       // Esto reiniciará el PID y la sub-máquina de estados.
+      // Falta cambiar el current proces a IDLE
+      currentState = IDLE;
       startSetpointProcess(setpoint);
       break;
     }

@@ -17,7 +17,7 @@
 #define VALVE_CO2_PIN 25      ///< Pin para controlar la válvula de CO2.
 #define VALVE_AIR_PIN 26      ///< Pin para controlar la válvula de Aire.
 #define VALVE_EXTERIOR_PIN 27 ///< Pin para controlar la válvula que conecta la atmosfera.
-#define MINI_PUMP 32          ///< Pin para controlar la mini bomba
+#define MINI_PUMP 33          ///< Pin para controlar la mini bomba
 
 /**
  * @enum SystemState
@@ -83,7 +83,7 @@ private:
   PIDController pidController;                    // Para guardar el setpoint del proceso actual
   unsigned long stableStartTime;                  // Marca de tiempo de cuándo se alcanzó la estabilidad.
   const unsigned long STABLE_TIMEOUT_MS = 120000; // 2 minuto para considerar el setpoint estable.
-  const float SETPOINT_DEADBAND_PPM = 50.0;       // Banda de tolerancia alrededor del setpoint.
+  const float SETPOINT_DEADBAND_PPM = 100.0;      // Banda de tolerancia alrededor del setpoint.
   unsigned long PULSE_CO2 = 50;                   // Duración del pulso de 50ms en la electrovalvula de CO2
 
   // Maquinas de estado
