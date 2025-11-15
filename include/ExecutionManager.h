@@ -17,7 +17,8 @@
 #define VALVE_CO2_PIN 25      ///< Pin para controlar la válvula de CO2.
 #define VALVE_AIR_PIN 26      ///< Pin para controlar la válvula de Aire.
 #define VALVE_EXTERIOR_PIN 27 ///< Pin para controlar la válvula que conecta la atmosfera.
-#define MINI_PUMP 33          ///< Pin para controlar la mini bomba
+#define MINI_PUMP 33          ///< Pin para controlar la mini bomba // Facu
+// #define MINI_PUMP 32 ///< Pin para controlar la mini bomba // Casa
 
 /**
  * @enum SystemState
@@ -30,7 +31,7 @@ enum SystemState
   SETPOINT_STABLE,       ///< El sistema ha alcanzado y estabilizado el setpoint de CO2.
   EXECUTING_CALIBRATION, ///< El sistema está ejecutando una rutina de calibración.
   PULSE,                 ///< El sistema está generando un pulso en la válvula de CO2.
-  PANIC_MODE             ///< Estado de emergencia donde se abren todas las válvulas.
+  LOWER_CONCENTRATION    ///< Estado para disminuir la concentración dentro de la camara.
 };
 
 /**
@@ -74,30 +75,28 @@ public:
   void startSetpointProcess(int targetConcentration);
   void startCalibrationProcess();
   void startPulseProcess(int durationMs);
-  void triggerPanicMode();
+  void TriggerLowerConcentration();
   SystemState getCurrentState(); // Metodo que devuelve un objeto del tipo SystemState
 
 private:
   // Atributos de control
-  int setpoint;                                   // Para guardar el setpoint del proceso actual
-  PIDController pidController;                    // Para guardar el setpoint del proceso actual
-  unsigned long stableStartTime;                  // Marca de tiempo de cuándo se alcanzó la estabilidad.
-  const unsigned long STABLE_TIMEOUT_MS = 120000; // 2 minuto para considerar el setpoint estable.
-  const float SETPOINT_DEADBAND_PPM = 100.0;      // Banda de tolerancia alrededor del setpoint.
-  unsigned long PULSE_CO2 = 50;                   // Duración del pulso de 50ms en la electrovalvula de CO2
-
+  int setpoint;                                           // Para guardar el setpoint del proceso actual
+  PIDController pidController;                            // Para guardar el setpoint del proceso actual
+  unsigned long stableStartTime;                          // Marca de tiempo de cuándo se alcanzó la estabilidad.
+  const unsigned long STABLE_TIMEOUT_MS = 10 * 60 * 1000; // 10 minuto para considerar el setpoint estable.
+  const float SETPOINT_DEADBAND_PPM = 50.0;               // Banda de tolerancia alrededor del setpoint.
+  unsigned long PULSE_CO2;                                // Duración del pulso de 50ms en la electrovalvula de CO2
+  bool lowerConcentrationFlag = false;
   // Maquinas de estado
   SystemState currentState;       // Almacena el estado actual de la máquina de estados.
   SetpointSubState setpointState; ///< Estado actual del ciclo de control PID.
   PulseState pulseState;          //< Estado actual del ciclo de pulso de 10ms
 
   // Tiempos
-  unsigned long lastCycleTime;                        ///< Marca de tiempo para el inicio de cada fase.
-  float lastPidOutput;                                ///< Almacena la última salida del PID para usarla durante la fase de actuación.
-  const unsigned long STABILIZATION_TIME_MS = 120000; ///< (T_estabilizacion) Tiempo de espera para que la mezcla se homogeneice (120s).
-  const uint8_t ACTUATION_TIME_MS = 50;               ///< (T_ciclo) Duración total del ciclo de actuación de las válvulas de CO2(50ms).
-
-  // El tiempo de muestreo (h) será implícitamente la suma de estos dos.
+  unsigned long lastCycleTime;                               ///< Marca de tiempo para el inicio de cada fase.
+  float lastPidOutput;                                       ///< Almacena la última salida del PID para usarla durante la fase de actuación.
+  const unsigned long STABILIZATION_TIME_MS = 5 * 60 * 1000; ///< (T_estabilizacion) Tiempo de espera para que la mezcla se homogeneice (5 min).
+  const uint8_t ACTUATION_TIME_MS = 50;                      ///< (T_ciclo) Duración total del ciclo de actuación de las válvulas de CO2(50ms).
 };
 
 #endif // EXECUTION_MANAGER_H

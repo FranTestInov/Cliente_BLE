@@ -43,10 +43,14 @@ void ExecutionManager::init()
   digitalWrite(VALVE_EXTERIOR_PIN, LOW);
   digitalWrite(MINI_PUMP, LOW);
 
+  lowerConcentrationFlag = false;
+
+  PULSE_CO2 = 0;
+
   // --- Sintonizamos el PID con valores iniciales ---
   // Estos valores Kp, Ki, Kd se deben ajustar experimentalmente
   // Salida de 0 a 100 (representando 0% a 100% de tiempo de apertura de válvula)
-  pidController.tune(2.0, 0.5, 0.1, -100, 100);
+  pidController.tune(0.2, 0.0001, 0.005, -100, 100);
 
   Serial.println("Execution Manager inicializado.");
 }
@@ -62,15 +66,12 @@ void ExecutionManager::run()
   switch (currentState)
   {
   case IDLE:
-    digitalWrite(VALVE_CO2_PIN, LOW);
-    digitalWrite(VALVE_AIR_PIN, LOW);
-    digitalWrite(VALVE_EXTERIOR_PIN, LOW);
-    digitalWrite(MINI_PUMP, LOW);
     break;
 
   case EXECUTING_SETPOINT:
   {
     float error = abs(setpoint - communicationManager.getLastServerData().co2);
+    // Serial.printf("Error actual respecto al setpoint: %.1f ppm\n", error);
     if (error < SETPOINT_DEADBAND_PPM)
     {
       Serial.printf("Setpoint alcanzado. Error actual (%.1f ppm) dentro de la banda muerta (%.1f ppm).\n", error, SETPOINT_DEADBAND_PPM);
@@ -97,6 +98,7 @@ void ExecutionManager::run()
       {
         // Se cumplió el tiempo de estabilización, ahora inicia otro proceso de acción.
         setpointState = CALCULATING;
+        Serial.println("Tiempo de estabilización cumplido. Calculando nueva salida PID.");
       }
     }
     break;
@@ -174,6 +176,7 @@ void ExecutionManager::run()
     // Estamos en el setpoint. No hacemos nada con las válvulas.
     // Sin embargo, seguimos monitoreando por si la concentración sigue bajando.
     float error = abs(setpoint - communicationManager.getLastServerData().co2);
+    // Serial.printf("Monitoreando estabilidad. Error actual: %.1f ppm\n", error);
     if (error > SETPOINT_DEADBAND_PPM)
     {
       Serial.println("WARN: La concentración ha salido de la banda muerta. Reactivando PID.");
@@ -186,11 +189,12 @@ void ExecutionManager::run()
     }
     if (now - stableStartTime > STABLE_TIMEOUT_MS)
     {
-      Serial.println("El sistema ha permanecido estable por 2 minuto. Proceso finalizado.");
+      Serial.println("El sistema ha permanecido estable por 10 minuto. Proceso finalizado.");
       currentState = IDLE; // ¡Volvemos al estdo IDLE para recibir nuevos comandos!
     }
     break;
   }
+
   case EXECUTING_CALIBRATION:
   {
     Serial.println("Proceso de calibración finalizado en PCB2. Volviendo a IDLE.");
@@ -223,13 +227,28 @@ void ExecutionManager::run()
     }
   }
   break;
-  case PANIC_MODE:
+  case LOWER_CONCENTRATION:
   {
-    // Estado seguro
+    // Estado seguro - CO2 Cerrada
     digitalWrite(VALVE_CO2_PIN, LOW);
-    digitalWrite(VALVE_AIR_PIN, HIGH);
-    digitalWrite(VALVE_EXTERIOR_PIN, HIGH);
-    digitalWrite(MINI_PUMP, HIGH);
+
+    if (lowerConcentrationFlag)
+    {
+      digitalWrite(VALVE_AIR_PIN, HIGH);
+      digitalWrite(VALVE_EXTERIOR_PIN, HIGH);
+      digitalWrite(MINI_PUMP, HIGH);
+      currentState = IDLE;
+      // Serial.printf("V2, V3, Pumo ON, state %s", currentState);
+    }
+    else
+    {
+      digitalWrite(VALVE_AIR_PIN, LOW);
+      digitalWrite(VALVE_EXTERIOR_PIN, LOW);
+      digitalWrite(MINI_PUMP, LOW);
+      currentState = IDLE;
+      // Serial.printf("V2, V3, Pumo OFF, state %s", currentState);
+    }
+
     break;
   }
   }
@@ -299,7 +318,7 @@ void ExecutionManager::startPulseProcess(int durationMs)
 {
   if (currentState == IDLE)
   {
-    Serial.println("Iniciando proceso de Pulso de 10ms en la valvula de CO2");
+    Serial.printf("Iniciando proceso de Pulso de %d ms en la valvula de CO2", durationMs);
     pulseState = PULSE_START;
     lastCycleTime = millis();
     currentState = PULSE;
@@ -316,10 +335,27 @@ void ExecutionManager::startPulseProcess(int durationMs)
  *
  * Este estado es terminal y requiere un reinicio para salir.
  */
-void ExecutionManager::triggerPanicMode()
+void ExecutionManager::TriggerLowerConcentration()
 {
-  Serial.println("!!! MODO PÁNICO ACTIVADO !!!");
-  currentState = PANIC_MODE;
+  if (currentState == IDLE)
+  {
+    lowerConcentrationFlag = !lowerConcentrationFlag;
+    Serial.printf("Estado de la bandera; %d", lowerConcentrationFlag);
+    if (lowerConcentrationFlag)
+    {
+      Serial.println("Iniciando proceso de bajar la concentracion");
+      currentState = LOWER_CONCENTRATION;
+    }
+    else
+    {
+      Serial.println("Terminando proceso de bajar la concentracion");
+      currentState = LOWER_CONCENTRATION;
+    }
+  }
+  else
+  {
+    Serial.println("WARN: No se puede iniciar el proceso de bajar la concentración, otro proceso en curso");
+  }
 }
 
 /**

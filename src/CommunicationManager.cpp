@@ -144,7 +144,7 @@ void CommunicationManager::handleSerialCommands()
     }
     else if (command == "OPEN_ALL")
     {
-      executionManager.triggerPanicMode();
+      executionManager.TriggerLowerConcentration();
     }
     else
     {
