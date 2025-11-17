@@ -50,9 +50,9 @@ void ExecutionManager::init()
   // --- Sintonizamos el PID con valores iniciales ---
   // Estos valores Kp, Ki, Kd se deben ajustar experimentalmente
   // Salida de 0 a 100 (representando 0% a 100% de tiempo de apertura de válvula)
-  pidController.tune(0.2, 0.0001, 0.005, -100, 100);
+  pidController.tune(0.1, 0.0001, 0.005, -100, 100);
 
-  Serial.println("Execution Manager inicializado.");
+  Serial.println("Execution Manager inicializado.\n");
 }
 
 /**
@@ -76,6 +76,7 @@ void ExecutionManager::run()
     {
       Serial.printf("Setpoint alcanzado. Error actual (%.1f ppm) dentro de la banda muerta (%.1f ppm).\n", error, SETPOINT_DEADBAND_PPM);
       stableStartTime = now;
+      lastCycleTime = now;
       currentState = SETPOINT_STABLE;
       setpointState = MEASURING;
       // Apagamos las válvulas al entrar en estado estable.
@@ -83,7 +84,7 @@ void ExecutionManager::run()
       digitalWrite(VALVE_AIR_PIN, LOW);
       digitalWrite(VALVE_EXTERIOR_PIN, LOW);
       digitalWrite(MINI_PUMP, LOW);
-      Serial.printf("Cerramos todas las valvulas, apagamos la bomba");
+      Serial.printf("Cerramos todas las valvulas, apagamos la bomba\n");
       break; // Salimos del case para que la lógica aplique en el siguiente ciclo.
     }
 
@@ -96,9 +97,11 @@ void ExecutionManager::run()
       // Estamos esperando a que el gas se estabilice.
       if (now - lastCycleTime >= STABILIZATION_TIME_MS)
       {
+        int tiempo;
         // Se cumplió el tiempo de estabilización, ahora inicia otro proceso de acción.
         setpointState = CALCULATING;
-        Serial.println("Tiempo de estabilización cumplido. Calculando nueva salida PID.");
+        tiempo = STABILIZATION_TIME_MS / 60000;
+        Serial.printf("Tiempo de estabilización de %d min cumplido.");
       }
     }
     break;
@@ -122,46 +125,56 @@ void ExecutionManager::run()
 
     case ACTUATING:
     {
+      long dutyCycleTime = (ACTUATION_TIME_MS * lastPidOutput) / 100;
+
       if (lastPidOutput > 0)
       { // Inyectar CO2
 
         digitalWrite(VALVE_AIR_PIN, LOW);      // Cierra la valvula de aire
         digitalWrite(VALVE_EXTERIOR_PIN, LOW); // Cierra la valvula de exterior
         digitalWrite(MINI_PUMP, LOW);          // Apaga la bomba
-        Serial.printf("Cerramos las valvulas de aire y exterior, apagamos la bomba");
+        // Serial.printf("Seguridad: Cerramos las valvulas de aire y exterior, apagamos la bomba\n");
 
         // Salida positiva: queremos AÑADIR CO2.
         // Calcula cuánto tiempo de este ciclo la válvula debe estar abierta.
-        long dutyCycleTime = (ACTUATION_TIME_MS * lastPidOutput) / 100;
 
         if (now - lastCycleTime < dutyCycleTime)
         {                                    // Si todavía no termino el tiempo
           digitalWrite(VALVE_CO2_PIN, HIGH); // Abrimos válvula de CO2
-          Serial.printf("Abrimos la valvula de CO2");
+          // Serial.printf("Abrimos la valvula de CO2\n");
         }
         else
         {                                   // Paso el tiempo y hay que cerrar
           digitalWrite(VALVE_CO2_PIN, LOW); // Cerramos válvula de CO2
-          Serial.printf("Cerramos la valvula de CO2");
+          // Serial.printf("Cerramos la valvula de CO2\n");
         }
+        // Serial.printf("Valvula de CO2 abierta por: %d ms\n", dutyCycleTime);
       }
       else
       { // Bajar concentración
         // Por seguridad cerramos la valvula de CO2
         digitalWrite(VALVE_CO2_PIN, LOW); // Cerramos válvula de CO2
-        Serial.printf("Cerramos la valvula de CO2");
+        // Serial.printf("Seguridad: Cerramos la valvula de CO2");
 
         // Salida negativa: queremos bajar la concentración.
         // tenemos que abrir las valvulas de aire y la del exterior y prender la bomba
         digitalWrite(VALVE_AIR_PIN, HIGH);      // Cierra la valvula de aire
         digitalWrite(VALVE_EXTERIOR_PIN, HIGH); // Cierra la valvula de exterior
         digitalWrite(MINI_PUMP, HIGH);
-        Serial.printf("Abrimos la valvula de aire y la de exterior, prendemos la bombita");
+        // Serial.printf("Abrimos la valvula de aire y la de exterior, prendemos la bombita");
       }
 
       // Verificamos si el ciclo de actuación ha terminado.
       if (now - lastCycleTime >= ACTUATION_TIME_MS)
       {
+        if (lastPidOutput > 0)
+        {
+          printf(" Actuación de la valvula de CO2 por %d ms", dutyCycleTime);
+        }
+        else
+        {
+          printf("Bajando concentración");
+        }
         lastCycleTime = now;
         setpointState = MEASURING;
       }
@@ -189,7 +202,7 @@ void ExecutionManager::run()
     }
     if (now - stableStartTime > STABLE_TIMEOUT_MS)
     {
-      Serial.println("El sistema ha permanecido estable por 10 minuto. Proceso finalizado.");
+      Serial.println("El sistema ha permanecido estable por 15 minuto. Proceso finalizado.");
       currentState = IDLE; // ¡Volvemos al estdo IDLE para recibir nuevos comandos!
     }
     break;
@@ -318,7 +331,7 @@ void ExecutionManager::startPulseProcess(int durationMs)
 {
   if (currentState == IDLE)
   {
-    Serial.printf("Iniciando proceso de Pulso de %d ms en la valvula de CO2", durationMs);
+    Serial.printf("Iniciando comando de Pulso de %d ms en la valvula de CO2\n", durationMs);
     pulseState = PULSE_START;
     lastCycleTime = millis();
     currentState = PULSE;
@@ -326,7 +339,7 @@ void ExecutionManager::startPulseProcess(int durationMs)
   }
   else
   {
-    Serial.println("WARN: No se puede iniciar Pulso, otro proceso está en curso.");
+    Serial.println("WARN: No se puede iniciar Pulso, otro proceso está en curso.\n");
   }
 }
 
@@ -340,7 +353,7 @@ void ExecutionManager::TriggerLowerConcentration()
   if (currentState == IDLE)
   {
     lowerConcentrationFlag = !lowerConcentrationFlag;
-    Serial.printf("Estado de la bandera; %d", lowerConcentrationFlag);
+    // Serial.printf("Estado de la bandera; %d", lowerConcentrationFlag);
     if (lowerConcentrationFlag)
     {
       Serial.println("Iniciando proceso de bajar la concentracion");

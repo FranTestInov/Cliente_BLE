@@ -53,6 +53,8 @@ float PIDController::compute(float setpoint, float processVariable)
   // --- Suma de los Términos para obtener la salida "ideal" ---
   float output = p_term + integralTerm - d_term; // Restamos D porque actúa sobre la PV
 
+  Serial.println("output: " + String(output));
+
   // --- Aplicamos los límites (saturación - 100 ; +100) ---
   float clampedOutput = output;
   if (clampedOutput > maxOutput)
@@ -64,15 +66,16 @@ float PIDController::compute(float setpoint, float processVariable)
     clampedOutput = minOutput;
   }
 
+  Serial.println("clampedOutput: " + String(clampedOutput));
   // --- Anti-Windup ---
   // "Descargamos" el integrador si la salida fue limitada
   integralTerm += (clampedOutput - output);
 
   // --- Actualizamos las variables para el próximo ciclo ---
   previousProcessVariable = processVariable;
-  
-  lastComputeTime = now; // Guarda la ultima ejecución del PID
-  previousOutput = clampedOutput; // Guarda la ultima salida del 
+
+  lastComputeTime = now;          // Guarda la ultima ejecución del PID
+  previousOutput = clampedOutput; // Guarda la ultima salida del
 
   return clampedOutput;
 }

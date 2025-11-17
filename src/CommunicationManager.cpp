@@ -70,7 +70,7 @@ CommunicationManager::CommunicationManager(ExecutionManager &execManager) : exec
  */
 void CommunicationManager::init()
 {
-  Serial.begin(115200); // Usamos una velocidad más alta
+  Serial.begin(115200);
   BLEDevice::init("ESP32_BLE_Client");
   // scanForServer();
   Serial.println("Communication Manager inicializado.");
@@ -172,8 +172,8 @@ void CommunicationManager::sendStatusToPC()
 
   // Usamos un temporizador para no saturar el puerto serie
   static unsigned long lastStatusSendTime = 0;
-  if (millis() - lastStatusSendTime > 500)
-  { // Enviamos estado 2 veces por segundo
+  if (millis() - lastStatusSendTime > 1000)
+  { // Enviamos 1 veces por segundo
     lastStatusSendTime = millis();
     Serial.println(statusStr);
   }
