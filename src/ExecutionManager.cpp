@@ -50,7 +50,7 @@ void ExecutionManager::init()
   // --- Sintonizamos el PID con valores iniciales ---
   // Estos valores Kp, Ki, Kd se deben ajustar experimentalmente
   // Salida de 0 a 100 (representando 0% a 100% de tiempo de apertura de válvula)
-  pidController.tune(0.1, 0.0001, 0.005, -100, 100);
+  pidController.tune(0.1, 0, 0, -100, 100);
 
   Serial.println("Execution Manager inicializado.\n");
 }
@@ -101,7 +101,7 @@ void ExecutionManager::run()
         // Se cumplió el tiempo de estabilización, ahora inicia otro proceso de acción.
         setpointState = CALCULATING;
         tiempo = STABILIZATION_TIME_MS / 60000;
-        Serial.printf("Tiempo de estabilización de %d min cumplido.");
+        Serial.printf("Tiempo de estabilización de %d min cumplido.", tiempo);
       }
     }
     break;
@@ -110,10 +110,8 @@ void ExecutionManager::run()
     {
       // Leemos el valor estabilizado del sensor.
       float currentCO2 = communicationManager.getLastServerData().co2;
-
       // Calculamos la salida del PID (-100 a 100) y la guardamos.
       lastPidOutput = pidController.compute(setpoint, currentCO2);
-
       // Informamos por serial para depuración.
       Serial.printf("Setpoint: %d, Actual: %.0f, PID Salida: %.2f%%\n", setpoint, currentCO2, lastPidOutput);
 
@@ -163,20 +161,20 @@ void ExecutionManager::run()
         digitalWrite(MINI_PUMP, HIGH);
         // Serial.printf("Abrimos la valvula de aire y la de exterior, prendemos la bombita");
       }
-
       // Verificamos si el ciclo de actuación ha terminado.
       if (now - lastCycleTime >= ACTUATION_TIME_MS)
       {
         if (lastPidOutput > 0)
         {
-          printf(" Actuación de la valvula de CO2 por %d ms", dutyCycleTime);
+          printf("Actuación de la valvula de CO2 por %d ms. \n", dutyCycleTime);
         }
         else
         {
-          printf("Bajando concentración");
+          printf("Bajando concentración.\n");
         }
         lastCycleTime = now;
         setpointState = MEASURING;
+        printf("Pasando al estado MEASURING.\n");
       }
       break;
     }
