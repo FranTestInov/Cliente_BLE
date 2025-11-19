@@ -125,7 +125,16 @@ void ExecutionManager::run()
     {
       long dutyCycleTime = (ACTUATION_TIME_MS * lastPidOutput) / 100;
 
-      if (lastPidOutput > 0)
+      if (abs(lastPidOutput) <= 5)
+      {
+        // Dentro de un rango muerto, no hacemos nada.
+        digitalWrite(VALVE_CO2_PIN, LOW);      // Cerramos válvula de CO2
+        digitalWrite(VALVE_AIR_PIN, LOW);      // Cierra la valvula de aire
+        digitalWrite(VALVE_EXTERIOR_PIN, LOW); // Cierra la valvula de exterior
+        digitalWrite(MINI_PUMP, LOW);          // Apaga la bomba
+        // Serial.printf("Dentro del rango muerto. Todas las valvulas cerradas, bomba apagada.\n");
+      }
+      else if (lastPidOutput > 5)
       { // Inyectar CO2
 
         digitalWrite(VALVE_AIR_PIN, LOW);      // Cierra la valvula de aire
@@ -164,13 +173,17 @@ void ExecutionManager::run()
       // Verificamos si el ciclo de actuación ha terminado.
       if (now - lastCycleTime >= ACTUATION_TIME_MS)
       {
-        if (lastPidOutput > 0)
+        if (lastPidOutput > 5)
         {
-          printf("Actuación de la valvula de CO2 por %d ms. \n", dutyCycleTime);
+          Serial.printf("Abrimos la valvula CO2 por %d ms.\n", dutyCycleTime);
+        }
+        else if (lastPidOutput < -5)
+        {
+          Serial.printf("Abrimos la valvula de aire y la de exterior, prendemos la bombita\n");
         }
         else
         {
-          printf("Bajando concentración.\n");
+          Serial.printf("Dentro del rango muerto. Todas las valvulas cerradas, bomba apagada.\n");
         }
         lastCycleTime = now;
         setpointState = MEASURING;

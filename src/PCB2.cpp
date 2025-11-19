@@ -2,7 +2,7 @@
 #include "CommunicationManager.h"
 #include "ExecutionManager.h"
 
-// --- OBJETOS GLOBALES DE LOS Módulos ---
+// --- OBJETOS GLOBALES De Los Módulos ---
 ExecutionManager executionManager;
 CommunicationManager communicationManager(executionManager); // Le pasamos el executionManager
 

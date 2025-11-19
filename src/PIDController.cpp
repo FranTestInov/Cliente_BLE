@@ -17,22 +17,24 @@ void PIDController::tune(float kp, float ki, float kd, float minOut, float maxOu
 
 void PIDController::reset()
 {
-  integralTerm = 0.0;
-  previousProcessVariable = 0.0;
   lastComputeTime = millis();
-  float previousOutput = 0.0;
+  integralTerm = 0.0; // Resetea el termino integral
+  previousProcessVariable = 0.0;
+  previousOutput = 0.0;
 }
 
 float PIDController::compute(float setpoint, float processVariable)
 {
   unsigned long now = millis();
-  float timeChange = (float)(now - lastComputeTime);
+  float timeChange = (float)(now - lastComputeTime); // Tiempo de cambio
 
   float dt_sec = timeChange / 1000.0f;
-  if (dt_sec <= 0.001f)
-  {
-    return previousOutput;
-  }
+
+  // if (dt_sec <= 0.001f)
+  // {
+  //   Serial.printf("Salgo porque recien se reseteo el PID o dt muy pequeño: %f\n", dt_sec);
+  //   return 0.0;
+  // }
 
   // --- Cálculo de los 3 Términos ---
   float error = setpoint - processVariable;
@@ -72,6 +74,11 @@ float PIDController::compute(float setpoint, float processVariable)
 
   // --- Actualizamos las variables para el próximo ciclo ---
   previousProcessVariable = processVariable;
+
+  if (previousProcessVariable == 0.0)
+  {
+    previousProcessVariable = processVariable;
+  }
 
   lastComputeTime = now;          // Guarda la ultima ejecución del PID
   previousOutput = clampedOutput; // Guarda la ultima salida del

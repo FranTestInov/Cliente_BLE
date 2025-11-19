@@ -29,6 +29,7 @@ private:
   // --- Temporización ---
   unsigned long lastComputeTime = 0;
 
+  // --- Última Salida ---
   float previousOutput = 0.0;
 };
 
