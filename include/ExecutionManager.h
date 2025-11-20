@@ -42,7 +42,11 @@ enum SetpointSubState
 {
   MEASURING,   ///< El sistema está esperando que el sensor se estabilice para tomar una nueva medida.
   CALCULATING, ///< El sistema calcula la nueva salida del PID.
-  ACTUATING    ///< El sistema aplica la salida del PID a las válvulas durante un ciclo de PWM.
+  INYECT_CO2,  ///< Inyecta CO2.
+  INYECT_AIR,  ///< Inyecta Aire
+
+  ACTUATING, ///< Vuela.
+
 };
 
 /**
@@ -80,13 +84,17 @@ public:
 
 private:
   // Atributos de control
-  int setpoint;                                           // Para guardar el setpoint del proceso actual
+  int setpoint;        // Para guardar el setpoint del proceso actual
+  float lastPidOutput; ///< Almacena la última salida del PID para usarla durante la fase de actuación.
+  float previousPidOutput;
   PIDController pidController;                            // Para guardar el setpoint del proceso actual
   unsigned long stableStartTime;                          // Marca de tiempo de cuándo se alcanzó la estabilidad.
   const unsigned long STABLE_TIMEOUT_MS = 10 * 60 * 1000; // 10 minuto para considerar el setpoint estable.
   const float SETPOINT_DEADBAND_PPM = 50.0;               // Banda de tolerancia alrededor del setpoint.
   unsigned long PULSE_CO2;                                // Duración del pulso de 50ms en la electrovalvula de CO2
   bool lowerConcentrationFlag = false;
+  long dutyCycleTime;
+
   // Maquinas de estado
   SystemState currentState;       // Almacena el estado actual de la máquina de estados.
   SetpointSubState setpointState; ///< Estado actual del ciclo de control PID.
@@ -94,9 +102,10 @@ private:
 
   // Tiempos
   unsigned long lastCycleTime;                               ///< Marca de tiempo para el inicio de cada fase.
-  float lastPidOutput;                                       ///< Almacena la última salida del PID para usarla durante la fase de actuación.
   const unsigned long STABILIZATION_TIME_MS = 5 * 60 * 1000; ///< (T_estabilizacion) Tiempo de espera para que la mezcla se homogeneice (5 min).
+  long TIMEOUT_AIR_INJECTION = 4 * 60 * 1000;                ///< Tiempo máximo de inyección de aire para evitar sobreactuación (5 - 4 = 1 min).
   const uint8_t ACTUATION_TIME_MS = 50;                      ///< (T_ciclo) Duración total del ciclo de actuación de las válvulas de CO2(50ms).
+  const uint8_t TIEMPO_MINIMO_ACTUACION_VALVULA = 5;         ///< (T_min_electrovalvula) el minimo tiempo necesario para actuar la electrovalvula.
 };
 
 #endif // EXECUTION_MANAGER_H
